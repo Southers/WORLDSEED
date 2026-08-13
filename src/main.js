@@ -22,6 +22,10 @@ const WorldCounterElement = document.querySelector('#WorldCounter');
 const InstructionPanelElement = document.querySelector('#InstructionPanel');
 const InstructionTitleElement = document.querySelector('#InstructionTitle');
 const InstructionBodyElement = document.querySelector('#InstructionBody');
+const AimPanelElement = document.querySelector('#AimPanel');
+const AimLabelElement = document.querySelector('#AimLabel');
+const AimPowerFillElement = document.querySelector('#AimPowerFill');
+const AimPowerValueElement = document.querySelector('#AimPowerValue');
 const StatusToastElement = document.querySelector('#StatusToast');
 const VictoryPanelElement = document.querySelector('#VictoryPanel');
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
@@ -79,6 +83,10 @@ let LastSafeWorldIdentifier = StartingWorldIdentifier;
 let RecoveryTimeoutIdentifier = null;
 let StatusToastTimeoutIdentifier = null;
 let VictoryTimeoutIdentifier = null;
+let HasLaunchedOnce = false;
+let LaunchPulseLifeSeconds = 0;
+let ImpactPulseLifeSeconds = 0;
+let CameraImpactLifeSeconds = 0;
 let SeedPhysicsState = {
   position: createVector(),
   velocity: createVector(),
@@ -302,6 +310,20 @@ for (const WorldDefinition of WorldDefinitions) {
   createWorld(WorldDefinition);
 }
 
+/** A soft target beacon makes the intended first shot legible without adding a menu. */
+const TargetBeaconGeometry = new THREE.RingGeometry(3.55, 3.68, 72);
+const TargetBeaconMaterial = new THREE.MeshBasicMaterial({
+  color: 0xd9f6cc,
+  transparent: true,
+  opacity: 0.18,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const TargetBeaconMesh = new THREE.Mesh(TargetBeaconGeometry, TargetBeaconMaterial);
+TargetBeaconMesh.position.set(7.8, -3.3, 0.08);
+Scene.add(TargetBeaconMesh);
+
 /** The seed is intentionally bright and oversized enough to remain readable on mobile. */
 const SeedGroup = new THREE.Group();
 const SeedCoreGeometry = new THREE.IcosahedronGeometry(SeedRadius, 2);
@@ -346,7 +368,13 @@ SeedGroup.add(SeedPointerHitMesh);
  * Launch preview uses a single line plus a terminal landing marker. The final art pass can
  * convert this to a dotted shader or particle trail without touching trajectory logic.
  */
+const MaximumPreviewPointCount = Math.ceil(MaximumTrajectoryPredictionSteps / 4) + 2;
+const TrajectoryPositionValues = new Float32Array(MaximumPreviewPointCount * 3);
 const TrajectoryGeometry = new THREE.BufferGeometry();
+const TrajectoryPositionAttribute = new THREE.BufferAttribute(TrajectoryPositionValues, 3);
+TrajectoryPositionAttribute.setUsage(THREE.DynamicDrawUsage);
+TrajectoryGeometry.setAttribute('position', TrajectoryPositionAttribute);
+TrajectoryGeometry.setDrawRange(0, 0);
 const TrajectoryMaterial = new THREE.LineBasicMaterial({
   color: 0xd9f6cc,
   transparent: true,
@@ -370,6 +398,42 @@ const LandingMarkerMesh = new THREE.Mesh(LandingMarkerGeometry, LandingMarkerMat
 LandingMarkerMesh.visible = false;
 LandingMarkerMesh.position.z = 0.18;
 Scene.add(LandingMarkerMesh);
+
+/** Reused rings provide launch snap and landing impact without allocating during play. */
+const FeedbackPulseGeometry = new THREE.RingGeometry(0.42, 0.55, 36);
+function createFeedbackPulse(Color) {
+  const PulseMaterial = new THREE.MeshBasicMaterial({
+    color: Color,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const PulseMesh = new THREE.Mesh(FeedbackPulseGeometry, PulseMaterial);
+  PulseMesh.visible = false;
+  Scene.add(PulseMesh);
+  return PulseMesh;
+}
+
+const LaunchPulseMesh = createFeedbackPulse(0xd9f6cc);
+const ImpactPulseMesh = createFeedbackPulse(0xfff2bc);
+
+/** A dotted pull guide points away from the first target before the first launch. */
+const PullGuideGeometry = new THREE.BufferGeometry();
+const PullGuideMaterial = new THREE.LineDashedMaterial({
+  color: 0xd9f6cc,
+  transparent: true,
+  opacity: 0.42,
+  dashSize: 0.22,
+  gapSize: 0.14,
+  depthWrite: false,
+  depthTest: false,
+});
+const PullGuideLine = new THREE.Line(PullGuideGeometry, PullGuideMaterial);
+PullGuideLine.visible = false;
+PullGuideLine.renderOrder = 20;
+Scene.add(PullGuideLine);
 
 /**
  * Creates a small trail behind the flying seed using a fixed pool of sprites represented
@@ -570,6 +634,12 @@ function restoreWorld(WorldDefinition) {
 function attachSeedToWorld(WorldDefinition, ImpactPosition) {
   const SurfaceRestPosition = calculateSurfaceRestPosition(WorldDefinition, ImpactPosition);
 
+  ImpactPulseMesh.position.set(ImpactPosition.x, ImpactPosition.y, 0.22);
+  ImpactPulseMesh.scale.setScalar(1);
+  ImpactPulseMesh.visible = true;
+  ImpactPulseLifeSeconds = 0.58;
+  CameraImpactLifeSeconds = 0.24;
+
   SeedPhysicsState = {
     position: SurfaceRestPosition,
     velocity: createVector(),
@@ -589,7 +659,11 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
 
   if (GamePhase !== 'victoryPending' && GamePhase !== 'victory') {
     GamePhase = 'attached';
-    showInstruction('Drag the seed backwards', 'Release to launch. Let gravity do the rest.');
+    if (WorldDefinition.id === 'ember' && !getWorldDefinition('frost').restored) {
+      showInstruction('Ember is awake — aim for Frost', 'Pull down and right until the landing ring appears.');
+    } else {
+      showInstruction('Drag the seed backwards', 'Release to launch. Let gravity do the rest.');
+    }
   }
 }
 
@@ -637,6 +711,7 @@ function updateTrailParticles(DeltaTimeSeconds) {
 function clearTrajectoryPreview() {
   TrajectoryLine.visible = false;
   LandingMarkerMesh.visible = false;
+  TrajectoryGeometry.setDrawRange(0, 0);
 }
 
 /**
@@ -675,29 +750,60 @@ function updateAimPreview(CurrentPointerWorldPosition) {
   );
 
   /** Downsample the fixed-step prediction so a small line buffer remains cheap on mobile. */
-  const PreviewPositions = [];
   const PreviewSampleStride = 4;
+  let PreviewPointCount = 0;
   for (
     let PredictionPointIndex = 0;
     PredictionPointIndex < TrajectoryPrediction.points.length;
     PredictionPointIndex += PreviewSampleStride
   ) {
     const PredictionPoint = TrajectoryPrediction.points[PredictionPointIndex];
-    PreviewPositions.push(new THREE.Vector3(PredictionPoint.x, PredictionPoint.y, 0.12));
+    TrajectoryPositionAttribute.setXYZ(
+      PreviewPointCount,
+      PredictionPoint.x,
+      PredictionPoint.y,
+      0.12,
+    );
+    PreviewPointCount += 1;
   }
 
   const FinalPredictionPoint = TrajectoryPrediction.points[TrajectoryPrediction.points.length - 1];
-  if (PreviewPositions.length === 0 || PreviewPositions[PreviewPositions.length - 1].distanceToSquared(
-    TemporaryThreeVector.set(FinalPredictionPoint.x, FinalPredictionPoint.y, 0.12),
-  ) > 0.01) {
-    PreviewPositions.push(new THREE.Vector3(FinalPredictionPoint.x, FinalPredictionPoint.y, 0.12));
+  const LastPreviewOffset = Math.max(0, (PreviewPointCount - 1) * 3);
+  const FinalPointDifferenceX = TrajectoryPositionValues[LastPreviewOffset] - FinalPredictionPoint.x;
+  const FinalPointDifferenceY = TrajectoryPositionValues[LastPreviewOffset + 1] - FinalPredictionPoint.y;
+  if (
+    PreviewPointCount === 0
+    || ((FinalPointDifferenceX * FinalPointDifferenceX) + (FinalPointDifferenceY * FinalPointDifferenceY)) > 0.01
+  ) {
+    TrajectoryPositionAttribute.setXYZ(
+      PreviewPointCount,
+      FinalPredictionPoint.x,
+      FinalPredictionPoint.y,
+      0.12,
+    );
+    PreviewPointCount += 1;
   }
 
-  TrajectoryGeometry.setFromPoints(PreviewPositions);
-  TrajectoryLine.visible = PreviewPositions.length > 1;
+  TrajectoryPositionAttribute.needsUpdate = true;
+  TrajectoryGeometry.setDrawRange(0, PreviewPointCount);
+  TrajectoryGeometry.computeBoundingSphere();
+  TrajectoryLine.visible = PreviewPointCount > 1;
+
+  const PowerRatio = THREE.MathUtils.clamp(AimDragVector.length() / MaximumDragDistance, 0, 1);
+  const PowerPercentage = Math.round(PowerRatio * 100);
+  AimPowerFillElement.style.width = `${PowerPercentage}%`;
+  AimPowerValueElement.textContent = `${PowerPercentage}%`;
 
   if (TrajectoryPrediction.collisionWorldIdentifier) {
     const LandingWorldDefinition = getWorldDefinition(TrajectoryPrediction.collisionWorldIdentifier);
+    TrajectoryMaterial.color.set(0xd9f6cc);
+    TrajectoryMaterial.opacity = 0.82;
+    AimPanelElement.classList.add('is-locked');
+    AimLabelElement.textContent = 'LANDING LOCKED';
+    showInstruction(
+      `Release to awaken ${LandingWorldDefinition.label}`,
+      'The bright ring marks your landing.',
+    );
     const LandingDirection = TemporaryThreeVector.set(
       FinalPredictionPoint.x - LandingWorldDefinition.position.x,
       FinalPredictionPoint.y - LandingWorldDefinition.position.y,
@@ -710,7 +816,12 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     );
     LandingMarkerMesh.visible = true;
   } else {
+    TrajectoryMaterial.color.set(0x9db8c6);
+    TrajectoryMaterial.opacity = 0.48;
     LandingMarkerMesh.visible = false;
+    AimPanelElement.classList.remove('is-locked');
+    AimLabelElement.textContent = 'PULL';
+    showInstruction('Bend the path onto a grey world', 'Pull farther or change the angle.');
   }
 }
 
@@ -733,8 +844,9 @@ function handlePointerDown(PointerEventData) {
   ActivePointerIdentifier = PointerEventData.pointerId;
   GameCanvas.setPointerCapture(PointerEventData.pointerId);
   GameCanvas.classList.add('is-aiming');
+  PullGuideLine.visible = false;
+  AimPanelElement.hidden = false;
   updateAimPreview(CurrentPointerWorldPosition);
-  hideInstruction();
   PointerEventData.preventDefault();
 }
 
@@ -775,10 +887,11 @@ function handlePointerUp(PointerEventData) {
   IsPointerAiming = false;
   ActivePointerIdentifier = null;
   GameCanvas.classList.remove('is-aiming');
+  AimPanelElement.hidden = true;
   clearTrajectoryPreview();
 
   if (AimDragVector.length() < MinimumLaunchDragDistance) {
-    showInstruction('Drag the seed backwards', 'Release to launch. Let gravity do the rest.');
+    showInstruction('Grab the glowing seed', 'Pull away from your target, then release.');
     return;
   }
 
@@ -789,6 +902,11 @@ function handlePointerUp(PointerEventData) {
   );
   LaunchIgnoredWorldIdentifier = CurrentWorldIdentifier;
   GamePhase = 'flying';
+  HasLaunchedOnce = true;
+  LaunchPulseMesh.position.copy(SeedGroup.position);
+  LaunchPulseMesh.scale.setScalar(1);
+  LaunchPulseMesh.visible = true;
+  LaunchPulseLifeSeconds = 0.42;
   TrailEmissionAccumulatorSeconds = 0;
   hideInstruction();
 
@@ -829,9 +947,9 @@ function recoverSeedFromVoid() {
     CurrentWorldIdentifier = LastSafeWorldIdentifier;
     LaunchIgnoredWorldIdentifier = null;
     GamePhase = 'attached';
-    showInstruction('Try another angle', 'Use the dotted path to bend around gravity wells.');
+    showInstruction('Try another angle', 'Use the bright path to bend around gravity wells.');
     RecoveryTimeoutIdentifier = null;
-  }, 560);
+  }, 420);
 }
 
 /**
@@ -964,6 +1082,39 @@ function updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds) {
     const LandingPulseScale = 1 + (Math.sin(ElapsedTimeSeconds * 6) * 0.11);
     LandingMarkerMesh.scale.setScalar(LandingPulseScale);
   }
+
+  if (LaunchPulseLifeSeconds > 0) {
+    LaunchPulseLifeSeconds = Math.max(0, LaunchPulseLifeSeconds - DeltaTimeSeconds);
+    const LaunchProgress = 1 - (LaunchPulseLifeSeconds / 0.42);
+    LaunchPulseMesh.scale.setScalar(1 + (LaunchProgress * 3.4));
+    LaunchPulseMesh.material.opacity = (1 - LaunchProgress) * 0.68;
+    LaunchPulseMesh.visible = LaunchPulseLifeSeconds > 0;
+  }
+
+  if (ImpactPulseLifeSeconds > 0) {
+    ImpactPulseLifeSeconds = Math.max(0, ImpactPulseLifeSeconds - DeltaTimeSeconds);
+    const ImpactProgress = 1 - (ImpactPulseLifeSeconds / 0.58);
+    ImpactPulseMesh.scale.setScalar(1 + (ImpactProgress * 6.2));
+    ImpactPulseMesh.material.opacity = (1 - ImpactProgress) * 0.9;
+    ImpactPulseMesh.visible = ImpactPulseLifeSeconds > 0;
+    SeedGroup.scale.setScalar(1 + (Math.sin(ImpactProgress * Math.PI) * 0.16));
+  } else {
+    SeedGroup.scale.setScalar(1);
+  }
+
+  const IsOpeningCoachVisible = GamePhase === 'attached'
+    && CurrentWorldIdentifier === StartingWorldIdentifier
+    && !HasLaunchedOnce;
+  PullGuideLine.visible = IsOpeningCoachVisible;
+  TargetBeaconMesh.visible = !getWorldDefinition('ember').restored;
+  if (IsOpeningCoachVisible) {
+    PullGuideMaterial.dashOffset -= DeltaTimeSeconds * 0.9;
+  }
+  if (TargetBeaconMesh.visible) {
+    TargetBeaconMesh.rotation.z -= DeltaTimeSeconds * 0.35;
+    TargetBeaconMaterial.opacity = 0.13 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.055);
+    TargetBeaconMesh.scale.setScalar(1 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.025));
+  }
 }
 
 /**
@@ -985,6 +1136,16 @@ function updateCamera(DeltaTimeSeconds) {
 
   const CameraFollowAlpha = 1 - Math.exp(-DeltaTimeSeconds * 2.6);
   CameraLookTarget.lerp(DesiredCameraLookTarget, CameraFollowAlpha);
+
+  if (CameraImpactLifeSeconds > 0) {
+    CameraImpactLifeSeconds = Math.max(0, CameraImpactLifeSeconds - DeltaTimeSeconds);
+    const ShakeStrength = (CameraImpactLifeSeconds / 0.24) * 0.13;
+    Camera.position.x = Math.sin(Clock.elapsedTime * 93) * ShakeStrength;
+    Camera.position.y = Math.cos(Clock.elapsedTime * 77) * ShakeStrength;
+  } else {
+    Camera.position.x = 0;
+    Camera.position.y = 0;
+  }
   Camera.lookAt(CameraLookTarget);
 }
 
@@ -1024,12 +1185,29 @@ function resetGame() {
     window.clearTimeout(VictoryTimeoutIdentifier);
     VictoryTimeoutIdentifier = null;
   }
+  if (StatusToastTimeoutIdentifier !== null) {
+    window.clearTimeout(StatusToastTimeoutIdentifier);
+    StatusToastTimeoutIdentifier = null;
+  }
 
   IsPointerAiming = false;
   ActivePointerIdentifier = null;
+  HasLaunchedOnce = false;
+  LaunchPulseLifeSeconds = 0;
+  ImpactPulseLifeSeconds = 0;
+  CameraImpactLifeSeconds = 0;
+  LaunchPulseMesh.visible = false;
+  ImpactPulseMesh.visible = false;
+  SeedGroup.scale.setScalar(1);
+  Camera.position.x = 0;
+  Camera.position.y = 0;
   GameCanvas.classList.remove('is-aiming');
+  AimPanelElement.hidden = true;
+  AimPanelElement.classList.remove('is-locked');
   clearTrajectoryPreview();
   VictoryPanelElement.hidden = true;
+  StatusToastElement.classList.remove('is-visible');
+  StatusToastElement.textContent = '';
 
   for (const WorldDefinition of WorldDefinitions) {
     WorldDefinition.restored = WorldDefinition.isStartingWorld;
@@ -1087,8 +1265,28 @@ function resetGame() {
   GamePhase = 'attached';
   PhysicsAccumulatorSeconds = 0;
 
+  TemporaryThreeVector.set(
+    StartingWorldDefinition.position.x - FirstTargetWorldDefinition.position.x,
+    StartingWorldDefinition.position.y - FirstTargetWorldDefinition.position.y,
+    0.14,
+  ).normalize();
+  const PullGuideStart = new THREE.Vector3(
+    StartingSeedPosition.x + (TemporaryThreeVector.x * 0.45),
+    StartingSeedPosition.y + (TemporaryThreeVector.y * 0.45),
+    0.14,
+  );
+  const PullGuideEnd = new THREE.Vector3(
+    StartingSeedPosition.x + (TemporaryThreeVector.x * 2.7),
+    StartingSeedPosition.y + (TemporaryThreeVector.y * 2.7),
+    0.14,
+  );
+  PullGuideGeometry.setFromPoints([PullGuideStart, PullGuideEnd]);
+  PullGuideLine.computeLineDistances();
+  PullGuideLine.visible = true;
+  TargetBeaconMesh.visible = true;
+
   updateWorldCounter();
-  showInstruction('Drag the seed backwards', 'Release to launch. Let gravity do the rest.');
+  showInstruction('Grab the glowing seed', 'Pull away from EMBER, then release.');
 }
 
 /** Main frame loop. */
