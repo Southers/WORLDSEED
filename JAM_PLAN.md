@@ -23,6 +23,8 @@ Exit: the repository describes one coherent larger game and clearly separates su
 
 Exit: a playtester can make a meaningful destination choice and explain it.
 
+Checkpoint: implemented in First Light with Grove/Ember opening choices, Tide/Frost route divergence, persistent safe launch nodes, gold/green outcome feedback and deterministic prediction/live tests. Awaiting player feedback before final art.
+
 ## Milestone 2 — Tactical small bodies
 
 - Add one clearly identified Seedstone as a temporary launchpad.

@@ -4,7 +4,7 @@
 
 WORLDSEED began as a focused Three.js **Tiny Worlds** prototype and is now growing into an authored planetary campaign. It is a one-input orbital slingshot game: drag the living seed backwards, release it into the gravity wells of miniature planets, choose where to land, and rebuild a connected constellation one awakening at a time.
 
-The polished Meadow → Ember → Frost journey is the prologue and visual benchmark. The next development phase adds compact branching systems, persistent restored launch nodes, tactical Seedstones, predictable asteroids, optional route mastery and a lightweight story leading toward the Worldheart.
+The polished Meadow → Ember → Frost journey is the prologue and visual benchmark. The current First Light prototype now adds Grove and Tide as lightweight route-test worlds, proving compact branching systems and persistent restored launch nodes before tactical Seedstones, predictable asteroids, optional route mastery and the wider Worldheart campaign are built.
 
 ## Play
 
@@ -14,11 +14,12 @@ The current `main` build is deployed at **https://southers.github.io/WORLDSEED/*
 
 Use a clean browser at a desktop viewport and again at a portrait mobile viewport:
 
-1. Confirm the title, three worlds, glowing seed and first-shot pull guide render without console errors.
-2. Drag the seed away from Ember until the landing ring appears, then release; confirm Ember awakens.
-3. Launch into empty space; confirm the seed returns to its last world in under one second after leaving the play area.
-4. Use Reset (and `R` on desktop); confirm the counter, worlds and opening seed position reset.
-5. Awaken Ember and Frost; confirm the `2 / 2` counter and victory panel, then use Play again.
+1. Confirm five worlds, the glowing seed, two gold route rings and the GROVE/EMBER labels render without console errors.
+2. Land on Grove first; confirm `1 / 4` and that the next suggestions become FROST/EMBER.
+3. Reset, land on Ember first; confirm the next suggestions instead become TIDE/FROST.
+4. Launch into empty space; confirm the seed returns to its last world in under one second after leaving the play area.
+5. Use Reset (and `R` on desktop); confirm the counter, worlds, route labels and opening seed position reset.
+6. Awaken Grove, Ember, Frost and Tide in any reachable order; confirm `4 / 4`, the First Light victory panel and Play again.
 
 ## Current checkpoint
 
@@ -27,6 +28,11 @@ The current build includes:
 - deterministic spherical gravity;
 - drag-to-launch pointer controls;
 - trajectory prediction using the same physics model as the live seed;
+- outcome-driven landings on any physical destination rather than a scripted target order;
+- two suggested route choices with world-space HUD labels and a single instanced beacon draw call;
+- persistent restored launch nodes, so landing order changes the next useful geometry;
+- gold new-world locks, green safe-landing locks and explicit no-landing feedback;
+- lightweight Grove and Tide route prototypes alongside the three authored worlds;
 - world collisions and landing;
 - configurable planet-wrapping restoration waves driven by spherical distance from impact;
 - staged surface growth, atmosphere bloom and world motion behind each restoration wave;
@@ -42,9 +48,9 @@ The current build includes:
 - mobile-friendly pointer input;
 - framework-free physics tests.
 
-All three worlds now meet the authored diorama and mobile-scale silhouette bar. Ember's fast sparks and molten pulse contrast with Frost's slow glacial drift, while both reveal their luminous landmarks behind the same deterministic landing-driven restoration wave.
+Meadow, Ember and Frost meet the authored diorama and mobile-scale silhouette bar. Grove and Tide intentionally remain low-cost greybox spheres: their purpose is to prove that choosing a destination, changing launch position and routing through restored worlds is fun before they receive final art.
 
-The current playable build remains the linear First Light prologue. The next milestone is a greybox branching-system prototype that proves destination choice and landing-order strategy before additional finished worlds are produced.
+The current playable build is the branching First Light prototype. Grove-first recommends Frost/Ember next, while Ember-first recommends Tide/Frost; every world remains physically landable regardless of the suggestion. Desktop and 390×844 mobile regression reach the complete `4 / 4` Worldheart-facing victory at a measured peak of 180 draw calls.
 
 ### Visual budget
 

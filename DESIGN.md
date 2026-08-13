@@ -38,7 +38,7 @@ Restoration order matters because every awakened world becomes a persistent laun
 
 The campaign is a sequence of authored planetary systems rather than one unbounded procedural universe.
 
-- **Prologue — First Light:** the existing Meadow → Ember → Frost sequence teaches aim, gravity, landing and awakening.
+- **Prologue — First Light:** authored Meadow → Ember → Frost establishes the visual bar while Grove and Tide currently prove branching route choice and persistent launch nodes.
 - **System I — The Broken Belt:** introduces branching destinations, Seedstones and a predictable orbiting asteroid.
 - **System II — The Wandering Garden:** develops moving launch windows, moons and optional route challenges.
 - **System III — The Long Night:** combines longer gravity assists, tighter safe routes and stronger narrative stakes.

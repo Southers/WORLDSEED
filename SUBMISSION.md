@@ -18,7 +18,7 @@ Slingshot a living seed through the gravity wells of three tiny planets and awak
 
 ## Short description
 
-WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, and land on Meadow, Ember and Frost to send life racing around each tiny planet.
+WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, choose between tiny destinations and turn every successful landing into the next launch point on the journey to the Worldheart.
 
 ## Long-form description
 
@@ -29,7 +29,7 @@ WORLDSEED is a focused Three.js orbital slingshot game about restoring a miniatu
 Drag the glowing seed backwards and release it into the gravity wells of three authored tiny worlds. The trajectory preview uses the same deterministic fixed-step simulation as live flight, so every curved shot is yours. Land successfully and a luminous restoration wave wraps around the planet from the exact impact point, growing its diorama, atmosphere, motion and music in sequence.
 
 - **One expressive input:** drag and release with mouse, pen or touch.
-- **Three distinct tiny worlds:** welcoming Meadow, volcanic Ember and crystalline Frost.
+- **A connected First Light system:** authored Meadow, volcanic Ember and crystalline Frost plus Grove and Tide route prototypes.
 - **A trustworthy gravity toy:** prediction and live flight share one deterministic simulation.
 - **Immediate recovery:** failed shots return the seed quickly, preserving experimentation.
 - **An authored transformation:** every landing awakens colour, landmarks, ambience and another layer of the procedural score.
