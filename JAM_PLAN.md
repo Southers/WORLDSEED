@@ -46,6 +46,8 @@ Checkpoint: complete in First Light with a blue one-use Seedstone, the visible d
 
 Exit: the player understands the immediate shot, the current system objective and the campaign purpose.
 
+Checkpoint: implemented in First Light with an always-visible three-pip Worldheart objective, a route that unlocks after three of four dormant worlds, a physical gold exit governed by the shared deterministic prediction/live simulation, and a constellation summary that awards Heart while independently recording full-world Bloom and three-mote Arc. The player may exit early or keep routing for mastery. Desktop completion and deterministic tests are proven; final portrait-mobile completion remains the release gate for this checkpoint.
+
 ## Milestone 4 — Story and feedback
 
 - Add one-line awakening memories without blocking control.

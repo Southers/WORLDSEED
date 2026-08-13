@@ -95,6 +95,8 @@ The basic objective is to restore enough life to open the route to the system's 
 
 This supports replay without grinding, random drops or upgrade-tree maintenance.
 
+First Light sets the initial threshold at three of its four dormant worlds. Reaching that threshold reveals a gold Worldheart core as a physical destination; the player may take the exit immediately for Heart or continue routing to earn Bloom and Arc before leaving. Completion is therefore another authored shot, not a menu button or automatic counter trigger.
+
 ## Shot feedback
 
 Before release, the player should understand where the seed will go, what it will gain and what threatens it.

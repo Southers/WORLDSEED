@@ -13,7 +13,7 @@
   <meta property="og:image:height" content="600" />
   <meta name="twitter:card" content="summary_large_image" />
   <title>WORLDSEED</title>
-  <link rel="stylesheet" href="./src/style.css?v=20260813-7b" />
+  <link rel="stylesheet" href="./src/style.css?v=20260813-7c" />
 
   <!--
     Buildless import map for the five-day jam. Three.js is pinned and vendored so startup
@@ -48,6 +48,14 @@
       </div>
     </header>
 
+    <section id="ObjectivePanel" class="objective-panel" aria-live="polite">
+      <span class="objective-panel__label">WORLDHEART</span>
+      <span id="ObjectiveState" class="objective-panel__state">0 / 3</span>
+      <span class="objective-panel__pips" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+    </section>
+
     <section id="InstructionPanel" class="instruction-panel">
       <strong id="InstructionTitle">Choose GROVE or EMBER</strong>
       <span id="InstructionBody">Grab the seed, pull away from a gold-ringed world, then release.</span>
@@ -68,12 +76,27 @@
       <span class="route-label"></span>
       <span class="tactical-label tactical-label--seedstone"></span>
       <span class="tactical-label tactical-label--hazard"></span>
+      <span class="tactical-label tactical-label--worldheart"></span>
     </div>
 
     <section id="VictoryPanel" class="victory-panel" hidden>
-      <span class="victory-panel__eyebrow">FIRST LIGHT NETWORK RESTORED</span>
-      <h1>Everything is growing again.</h1>
-      <p>Five worlds. One seed. The path to the Worldheart is open.</p>
+      <span class="victory-panel__eyebrow">FIRST LIGHT RECONNECTED</span>
+      <h1 id="VictoryTitle">The Worldheart hears you.</h1>
+      <p id="VictoryBody">A living path reaches beyond this tiny system.</p>
+      <svg id="ConstellationSummary" class="constellation-summary" viewBox="0 0 240 92" role="img" aria-label="First Light constellation summary">
+        <path d="M24 70 L64 32 L120 18 L184 30 L214 68 M24 70 L118 70 L184 30 M64 32 L118 70" />
+        <g data-world-id="meadow"><circle cx="24" cy="70" r="5" /><title>Meadow</title></g>
+        <g data-world-id="grove"><circle cx="64" cy="32" r="5" /><title>Grove</title></g>
+        <g data-world-id="frost"><circle cx="120" cy="18" r="6" /><title>Frost</title></g>
+        <g data-world-id="tide"><circle cx="184" cy="30" r="5" /><title>Tide</title></g>
+        <g data-world-id="ember"><circle cx="118" cy="70" r="6" /><title>Ember</title></g>
+        <g data-world-id="worldheart" class="is-heart"><circle cx="214" cy="68" r="7" /><title>Worldheart</title></g>
+      </svg>
+      <div class="emblem-row" aria-label="First Light emblems">
+        <span class="emblem" data-emblem="heart"><strong>HEART</strong><small>RECONNECTED</small></span>
+        <span class="emblem" data-emblem="bloom"><strong>BLOOM</strong><small>ALL WORLDS</small></span>
+        <span class="emblem" data-emblem="arc"><strong>ARC</strong><small>3 STARDUST</small></span>
+      </div>
       <button id="PlayAgainButton" type="button">Play again</button>
     </section>
 
@@ -86,6 +109,6 @@
     </footer>
   </main>
 
-  <script type="module" src="./src/main.js?v=20260813-7b"></script>
+  <script type="module" src="./src/main.js?v=20260813-7c"></script>
 </body>
 </html>

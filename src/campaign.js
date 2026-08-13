@@ -26,6 +26,25 @@ export function isSystemRestored(WorldDefinitions) {
   );
 }
 
+/** Reports whether enough objective worlds are awake to expose the system exit. */
+export function isWorldheartUnlocked(WorldDefinitions, UnlockThreshold) {
+  return countRestoredWorlds(WorldDefinitions) >= UnlockThreshold;
+}
+
+/** Returns the three compact completion emblems shown at a Worldheart exit. */
+export function getSystemEmblems(
+  WorldDefinitions,
+  CollectedStardustCount,
+  TotalStardustCount,
+  HasReachedWorldheart,
+) {
+  return {
+    heart: HasReachedWorldheart,
+    bloom: isSystemRestored(WorldDefinitions),
+    arc: TotalStardustCount > 0 && CollectedStardustCount === TotalStardustCount,
+  };
+}
+
 /**
  * Suggests the nearest unrestored destinations from the current launch node.
  *
@@ -44,8 +63,16 @@ export function getRouteChoices(
     return [];
   }
 
-  return getRestorableWorlds(WorldDefinitions)
-    .filter((WorldDefinition) => !WorldDefinition.restored)
+  return WorldDefinitions
+    .filter((WorldDefinition) => (
+      !WorldDefinition.isStartingWorld
+      && !WorldDefinition.restored
+      && WorldDefinition.routeAvailable !== false
+      && (
+        WorldDefinition.countsTowardRestoration !== false
+        || WorldDefinition.isRouteDestination === true
+      )
+    ))
     .map((WorldDefinition, DefinitionIndex) => {
       const DifferenceX = WorldDefinition.position.x - CurrentWorldDefinition.position.x;
       const DifferenceY = WorldDefinition.position.y - CurrentWorldDefinition.position.y;

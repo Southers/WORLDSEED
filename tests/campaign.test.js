@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import {
   countRestoredWorlds,
   getRouteChoices,
+  getSystemEmblems,
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
+  isWorldheartUnlocked,
 } from '../src/campaign.js';
 
 function createFirstLightDefinitions() {
@@ -93,6 +95,68 @@ test('system completion counts only objective worlds', () => {
   }
   assert.equal(countRestoredWorlds(WorldDefinitions), 4);
   assert.equal(isSystemRestored(WorldDefinitions), true);
+});
+
+test('Worldheart opens at the authored threshold without requiring full Bloom', () => {
+  const WorldDefinitions = createFirstLightDefinitions();
+  const ObjectiveWorlds = WorldDefinitions.filter((WorldDefinition) => !WorldDefinition.isStartingWorld);
+  ObjectiveWorlds.slice(0, 2).forEach((WorldDefinition) => {
+    WorldDefinition.restored = true;
+  });
+  assert.equal(isWorldheartUnlocked(WorldDefinitions, 3), false);
+
+  ObjectiveWorlds[2].restored = true;
+  assert.equal(isWorldheartUnlocked(WorldDefinitions, 3), true);
+  assert.equal(isSystemRestored(WorldDefinitions), false);
+});
+
+test('route choices expose only an unlocked Worldheart destination', () => {
+  const WorldDefinitions = createFirstLightDefinitions();
+  const WorldheartDefinition = {
+    id: 'worldheart',
+    label: 'WORLDHEART',
+    position: { x: -4, y: 8, z: 0 },
+    restored: false,
+    countsTowardRestoration: false,
+    isRouteDestination: true,
+    routeAvailable: false,
+  };
+  WorldDefinitions.push(WorldheartDefinition);
+  assert.equal(
+    getRouteChoices(WorldDefinitions, 'frost', 5).some(
+      (WorldDefinition) => WorldDefinition.id === 'worldheart',
+    ),
+    false,
+  );
+
+  WorldheartDefinition.routeAvailable = true;
+  assert.equal(
+    getRouteChoices(WorldDefinitions, 'frost', 5).some(
+      (WorldDefinition) => WorldDefinition.id === 'worldheart',
+    ),
+    true,
+  );
+});
+
+test('system emblems separate basic completion from optional mastery', () => {
+  const WorldDefinitions = createFirstLightDefinitions();
+  WorldDefinitions.filter((WorldDefinition) => !WorldDefinition.isStartingWorld).slice(0, 3)
+    .forEach((WorldDefinition) => {
+      WorldDefinition.restored = true;
+    });
+
+  assert.deepEqual(getSystemEmblems(WorldDefinitions, 3, 3, true), {
+    heart: true,
+    bloom: false,
+    arc: true,
+  });
+
+  WorldDefinitions.find((WorldDefinition) => !WorldDefinition.restored).restored = true;
+  assert.deepEqual(getSystemEmblems(WorldDefinitions, 3, 3, true), {
+    heart: true,
+    bloom: true,
+    arc: true,
+  });
 });
 
 test('trajectory pickup prediction reports each uncollected mote once', () => {

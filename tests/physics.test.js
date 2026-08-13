@@ -301,6 +301,79 @@ test('the authored First Light Arc collects all stardust and lands on Frost', ()
   );
 });
 
+test('the authored Frost exit reaches the unlocked Worldheart deterministically', () => {
+  const FixedStepSeconds = 1 / 120;
+  const WorldDefinitions = [
+    { id: 'meadow', position: createVector(-8, -6.4, 0), radius: 3.35, gravitationalParameter: 92 },
+    { id: 'ember', position: createVector(7.8, -3.3, 0), radius: 3, gravitationalParameter: 82 },
+    { id: 'grove', position: createVector(-8.8, 3, 0), radius: 2.05, gravitationalParameter: 44 },
+    { id: 'frost', position: createVector(0.7, 8, 0), radius: 3.55, gravitationalParameter: 102 },
+    { id: 'tide', position: createVector(9.7, 6, 0), radius: 2.15, gravitationalParameter: 48 },
+  ];
+  const TacticalBodyDefinitions = [
+    {
+      id: 'wayfarer',
+      kind: 'hazard',
+      radius: 0.66,
+      orbit: {
+        centre: createVector(0.7, 8, 0),
+        radius: 5.35,
+        phaseRadians: -1.18,
+        angularSpeedRadiansPerSecond: 0.34,
+      },
+    },
+    {
+      id: 'worldheart',
+      kind: 'worldheart',
+      position: createVector(-4.35, 8.75, 0),
+      radius: 0.9,
+    },
+  ];
+  const StartingPosition = createVector(-0.5689926623506649, 4.164474270337876, 0);
+  const LaunchAngleRadians = 22 * (Math.PI / 180);
+  const LaunchVelocity = createVector(
+    Math.cos(LaunchAngleRadians) * 5.25,
+    Math.sin(LaunchAngleRadians) * 5.25,
+    0,
+  );
+  const StartTimeSeconds = 8;
+  const Prediction = predictTrajectory(
+    StartingPosition,
+    LaunchVelocity,
+    WorldDefinitions,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: FixedStepSeconds,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'frost',
+      collisionBodyDefinitions: TacticalBodyDefinitions,
+      startTimeSeconds: StartTimeSeconds,
+    },
+  );
+
+  let LiveState = { position: StartingPosition, velocity: LaunchVelocity };
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 520; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, WorldDefinitions, FixedStepSeconds);
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      0.46,
+      TacticalBodyDefinitions,
+      StartTimeSeconds + (StepIndex * FixedStepSeconds),
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(Prediction.collisionKind, 'worldheart');
+  assert.equal(Prediction.collisionBodyIdentifier, 'worldheart');
+  assert.equal(LiveCollision?.definition.id, 'worldheart');
+  assert.equal(LiveCollisionStep, Prediction.points.length - 1);
+});
+
 test('waiting changes an authored Tide-to-Frost asteroid shot from danger to landing', () => {
   const WorldDefinitions = [
     { id: 'meadow', position: createVector(-8, -6.4, 0), radius: 3.35, gravitationalParameter: 92 },

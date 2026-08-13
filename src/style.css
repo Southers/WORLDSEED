@@ -133,6 +133,70 @@ button {
   text-shadow: 0 0 14px rgba(255, 221, 120, 0.4);
 }
 
+.objective-panel {
+  position: absolute;
+  z-index: 4;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 3px 10px;
+  min-width: 176px;
+  padding: 8px 13px;
+  border: 1px solid rgba(255, 224, 153, 0.13);
+  border-radius: 15px;
+  background: rgba(5, 12, 20, 0.5);
+  backdrop-filter: blur(10px);
+  text-align: left;
+  transition: border-color 260ms ease, box-shadow 260ms ease;
+}
+
+.objective-panel__label {
+  color: rgba(255, 231, 174, 0.7);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.17em;
+}
+
+.objective-panel__state {
+  color: rgba(228, 236, 240, 0.72);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-align: right;
+}
+
+.objective-panel__pips {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.objective-panel__pips span {
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 240ms ease, box-shadow 240ms ease;
+}
+
+.objective-panel__pips span.is-filled,
+.objective-panel.is-open .objective-panel__pips span {
+  background: #dff5a7;
+  box-shadow: 0 0 8px rgba(210, 244, 144, 0.45);
+}
+
+.objective-panel.is-open {
+  border-color: rgba(255, 224, 153, 0.42);
+  box-shadow: 0 0 30px rgba(255, 206, 113, 0.12);
+}
+
+.objective-panel.is-open .objective-panel__state {
+  color: #ffe4a0;
+}
+
 .instruction-panel {
   position: absolute;
   z-index: 4;
@@ -282,6 +346,12 @@ button {
   box-shadow: 0 0 18px rgba(255, 118, 109, 0.12);
 }
 
+.tactical-label--worldheart {
+  border-color: rgba(255, 218, 130, 0.3);
+  color: #ffe2a0;
+  box-shadow: 0 0 20px rgba(255, 205, 108, 0.12);
+}
+
 .route-label:empty,
 .tactical-label:empty {
   display: none;
@@ -329,6 +399,74 @@ button {
   cursor: pointer;
 }
 
+.constellation-summary {
+  display: block;
+  width: min(100%, 310px);
+  height: 92px;
+  margin: 2px auto 14px;
+  overflow: visible;
+}
+
+.constellation-summary path {
+  fill: none;
+  stroke: rgba(197, 216, 226, 0.16);
+  stroke-width: 1.25;
+}
+
+.constellation-summary circle {
+  fill: #424d55;
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 2;
+}
+
+.constellation-summary g.is-awake circle {
+  fill: #a9d58f;
+  stroke: #e7ffd3;
+  filter: drop-shadow(0 0 5px rgba(183, 236, 151, 0.7));
+}
+
+.constellation-summary g.is-heart.is-awake circle {
+  fill: #ffd978;
+  stroke: #fff0b8;
+  filter: drop-shadow(0 0 7px rgba(255, 211, 111, 0.85));
+}
+
+.emblem-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 0 auto 20px;
+}
+
+.emblem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: rgba(220, 230, 235, 0.34);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.emblem strong {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+}
+
+.emblem small {
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.emblem.is-earned {
+  border-color: rgba(255, 225, 148, 0.26);
+  color: #ffe7a8;
+  background: rgba(255, 220, 130, 0.07);
+  box-shadow: inset 0 0 18px rgba(255, 212, 110, 0.05);
+}
+
 .victory-panel button {
   padding: 11px 18px;
   border-radius: 999px;
@@ -360,6 +498,16 @@ button {
 
   .instruction-panel {
     bottom: max(62px, calc(env(safe-area-inset-bottom) + 56px));
+  }
+
+  .objective-panel {
+    top: 62px;
+    min-width: 168px;
+    padding: 7px 11px;
+  }
+
+  .victory-panel {
+    padding: 24px 22px;
   }
 
   .aim-panel {
