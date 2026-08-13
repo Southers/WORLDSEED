@@ -2,7 +2,7 @@
 
 ## Runtime libraries
 
-- [Three.js](https://threejs.org/) 0.179.1 — MIT License.
+- [Three.js](https://threejs.org/) 0.179.1 — MIT License; the pinned runtime is vendored at `vendor/three.module.min.js` and `vendor/three.core.min.js`, with its licence at `vendor/THREE-LICENSE.txt`.
 
 ## External art/audio assets
 

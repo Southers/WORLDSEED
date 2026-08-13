@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const ScriptDirectory = dirname(fileURLToPath(import.meta.url));
 const RepositoryRoot = join(ScriptDirectory, '..');
 const PublicGameUrl = 'https://southers.github.io/WORLDSEED/';
+const ExpectedThreeRuntimeSha256 = '06552c54e4071fbc7305117aafe6765d92c5d2a2a83507d4f05b9bf4f3d4d463';
+const ExpectedThreeCoreSha256 = '79f2b4f58d3e99a9948a4d3b7f6d5c2daf705bdefe9fb82ebec715623966551c';
 const RequiredTextFiles = [
   'AGENTS.md',
   'CREDITS.md',
@@ -19,6 +22,7 @@ const RequiredTextFiles = [
   'src/physics.js',
   'src/restoration.js',
   'src/style.css',
+  'vendor/THREE-LICENSE.txt',
 ];
 const RequiredSubmissionImages = [
   'submission/opening.png',
@@ -78,6 +82,32 @@ async function verifyLocalRelease() {
   requireText(IndexHtml, 'twitter:card', 'index.html');
   requirePattern(IndexHtml, /src\/style\.css\?v=[^"']+/, 'index.html stylesheet');
   requirePattern(IndexHtml, /src\/main\.js\?v=[^"']+/, 'index.html module');
+  requireText(IndexHtml, '"three": "./vendor/three.module.min.js?v=0.179.1"', 'index.html import map');
+  assert.ok(!IndexHtml.includes('cdn.jsdelivr.net'), 'index.html must not require jsDelivr');
+
+  const ThreeRuntimeBuffer = await readRequiredFile('vendor/three.module.min.js');
+  const ThreeRuntimeSha256 = createHash('sha256').update(ThreeRuntimeBuffer).digest('hex');
+  assert.equal(
+    ThreeRuntimeSha256,
+    ExpectedThreeRuntimeSha256,
+    'Vendored Three.js runtime must match the pinned 0.179.1 module',
+  );
+  requireText(
+    ThreeRuntimeBuffer.toString('utf8'),
+    './three.core.min.js',
+    'vendored Three.js module dependency',
+  );
+  const ThreeCoreBuffer = await readRequiredFile('vendor/three.core.min.js');
+  assert.equal(
+    createHash('sha256').update(ThreeCoreBuffer).digest('hex'),
+    ExpectedThreeCoreSha256,
+    'Vendored Three.js core must match pinned 0.179.1',
+  );
+  requireText(
+    TextByPath.get('vendor/THREE-LICENSE.txt'),
+    'The MIT License',
+    'vendored Three.js license',
+  );
 
   const MainJavaScript = TextByPath.get('src/main.js');
   requirePattern(MainJavaScript, /\.\/audio\.js\?v=[^"']+/, 'main audio import');
@@ -118,6 +148,27 @@ async function verifyOnlineRelease() {
   const PublicMainJavaScript = await ModuleResponse.text();
   requireText(PublicMainJavaScript, "dataset.build = '", 'public main module');
 
+  const RuntimeMatch = PublicHtml.match(/"three"\s*:\s*"([^"]+)"/);
+  assert.ok(RuntimeMatch, 'Public index must reference the vendored Three.js runtime');
+  const RuntimeUrl = new URL(RuntimeMatch[1], PublicGameUrl);
+  const RuntimeResponse = await fetch(RuntimeUrl, { cache: 'no-store' });
+  assert.ok(RuntimeResponse.ok, `Public Three.js runtime returned HTTP ${RuntimeResponse.status}`);
+  const RuntimeBuffer = Buffer.from(await RuntimeResponse.arrayBuffer());
+  assert.equal(
+    createHash('sha256').update(RuntimeBuffer).digest('hex'),
+    ExpectedThreeRuntimeSha256,
+    'Public Three.js runtime must match pinned 0.179.1',
+  );
+  const CoreUrl = new URL('./three.core.min.js', RuntimeUrl);
+  const CoreResponse = await fetch(CoreUrl, { cache: 'no-store' });
+  assert.ok(CoreResponse.ok, `Public Three.js core returned HTTP ${CoreResponse.status}`);
+  const CoreBuffer = Buffer.from(await CoreResponse.arrayBuffer());
+  assert.equal(
+    createHash('sha256').update(CoreBuffer).digest('hex'),
+    ExpectedThreeCoreSha256,
+    'Public Three.js core must match pinned 0.179.1',
+  );
+
   const ThumbnailUrl = new URL('submission/thumbnail.png', PublicGameUrl);
   ThumbnailUrl.searchParams.set('release-check', String(Date.now()));
   const ThumbnailResponse = await fetch(ThumbnailUrl, { cache: 'no-store' });
@@ -133,7 +184,9 @@ async function verifyOnlineRelease() {
 
   return {
     buildMarker: PublicMainJavaScript.match(/dataset\.build = '([^']+)'/)?.[1] ?? 'unknown',
+    coreStatus: CoreResponse.status,
     pageStatus: PageResponse.status,
+    runtimeStatus: RuntimeResponse.status,
     thumbnailContentType: ThumbnailContentType,
     thumbnailStatus: ThumbnailResponse.status,
   };
@@ -147,6 +200,6 @@ console.log('WORLDSEED release audit passed.');
 console.log(`Local package: ${LocalEvidence.textFiles} required files, ${LocalEvidence.images} screenshots.`);
 if (OnlineEvidence) {
   console.log(
-    `Public build: HTTP ${OnlineEvidence.pageStatus}, thumbnail HTTP ${OnlineEvidence.thumbnailStatus} ${OnlineEvidence.thumbnailContentType}, marker ${OnlineEvidence.buildMarker}.`,
+    `Public build: HTTP ${OnlineEvidence.pageStatus}, runtime/core HTTP ${OnlineEvidence.runtimeStatus}/${OnlineEvidence.coreStatus}, thumbnail HTTP ${OnlineEvidence.thumbnailStatus} ${OnlineEvidence.thumbnailContentType}, marker ${OnlineEvidence.buildMarker}.`,
   );
 }

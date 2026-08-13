@@ -50,7 +50,7 @@ The tiny worlds are both the subject and the mechanic. Their curved surfaces cre
 
 ### Technology
 
-- Three.js r179
+- Three.js r179, pinned and vendored for CDN-independent startup
 - Framework-free JavaScript and Web Audio
 - Deterministic 120 Hz fixed-step physics shared by prediction and live flight
 - Procedural geometry, shaders, particles, music and sound effects

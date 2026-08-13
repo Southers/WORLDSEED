@@ -16,13 +16,13 @@
   <link rel="stylesheet" href="./src/style.css?v=20260813-5c" />
 
   <!--
-    Buildless import map for the five-day jam. Three.js is pinned so the demo is deterministic.
-    Before final submission we can vendor this dependency if offline reliability is desirable.
+    Buildless import map for the five-day jam. Three.js is pinned and vendored so startup
+    does not depend on a third-party CDN.
   -->
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js"
+        "three": "./vendor/three.module.min.js?v=0.179.1"
       }
     }
   </script>
