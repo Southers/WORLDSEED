@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  calculateBodyPositionAtTime,
   calculateDistanceSquared,
   calculateGravityAcceleration,
   createVector,
+  findCollidingBody,
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
@@ -77,6 +79,219 @@ test('trajectory prediction reports a world landing', () => {
 
   assert.equal(TrajectoryPrediction.collisionWorldIdentifier, 'target');
   assert.ok(TrajectoryPrediction.points.length > 2);
+});
+
+test('orbiting body positions are a deterministic function of simulation time', () => {
+  const AsteroidDefinition = {
+    id: 'wayfarer',
+    radius: 0.55,
+    orbit: {
+      centre: createVector(2, -1, 0),
+      radius: 4,
+      phaseRadians: Math.PI / 2,
+      angularSpeedRadiansPerSecond: Math.PI / 2,
+    },
+  };
+
+  const StartingAsteroidPosition = calculateBodyPositionAtTime(AsteroidDefinition, 0);
+  assert.ok(Math.abs(StartingAsteroidPosition.x - 2) < 0.000001);
+  assert.ok(Math.abs(StartingAsteroidPosition.y - 3) < 0.000001);
+  assert.equal(StartingAsteroidPosition.z, 0);
+  const HalfSecondPosition = calculateBodyPositionAtTime(AsteroidDefinition, 0.5);
+  assert.ok(Math.abs(HalfSecondPosition.x - (2 - Math.sqrt(8))) < 0.000001);
+  assert.ok(Math.abs(HalfSecondPosition.y - (-1 + Math.sqrt(8))) < 0.000001);
+});
+
+test('prediction and live flight hit a moving asteroid on the same fixed step', () => {
+  const FixedStepSeconds = 1 / 120;
+  const SeedRadius = 0.2;
+  const AsteroidDefinitions = [{
+    id: 'wayfarer',
+    kind: 'hazard',
+    radius: 0.3,
+    orbit: {
+      centre: createVector(0, 0, 0),
+      radius: 2,
+      phaseRadians: Math.PI,
+      angularSpeedRadiansPerSecond: 0.1,
+    },
+  }];
+  const StartingPosition = createVector(-5, 0, 0);
+  const StartingVelocity = createVector(3, 0, 0);
+
+  const Prediction = predictTrajectory(
+    StartingPosition,
+    StartingVelocity,
+    [],
+    {
+      seedRadius: SeedRadius,
+      fixedStepSeconds: FixedStepSeconds,
+      maximumSteps: 240,
+      ignoredWorldIdentifier: null,
+      collisionBodyDefinitions: AsteroidDefinitions,
+      startTimeSeconds: 0,
+    },
+  );
+
+  let LiveState = { position: StartingPosition, velocity: StartingVelocity };
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 240; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, [], FixedStepSeconds);
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      SeedRadius,
+      AsteroidDefinitions,
+      StepIndex * FixedStepSeconds,
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(Prediction.collisionKind, 'hazard');
+  assert.equal(Prediction.collisionBodyIdentifier, 'wayfarer');
+  assert.equal(LiveCollision?.definition.id, 'wayfarer');
+  assert.equal(LiveCollisionStep, Prediction.points.length - 1);
+});
+
+test('First Light Seedstone is reachable with matching prediction and live flight', () => {
+  const FixedStepSeconds = 1 / 120;
+  const SeedRadius = 0.46;
+  const WorldDefinitions = [
+    { id: 'meadow', position: createVector(-8, -6.4, 0), radius: 3.35, gravitationalParameter: 92 },
+    { id: 'ember', position: createVector(7.8, -3.3, 0), radius: 3, gravitationalParameter: 82 },
+    { id: 'grove', position: createVector(-8.8, 3, 0), radius: 2.05, gravitationalParameter: 44 },
+    { id: 'frost', position: createVector(0.7, 8, 0), radius: 3.55, gravitationalParameter: 102 },
+    { id: 'tide', position: createVector(9.7, 6, 0), radius: 2.15, gravitationalParameter: 48 },
+  ];
+  const SeedstoneDefinitions = [{
+    id: 'seedstone',
+    kind: 'seedstone',
+    position: createVector(0.15, -0.55, 0),
+    radius: 0.72,
+  }];
+  const MeadowToEmber = createVector(15.8, 3.1, 0);
+  const MeadowToEmberLength = Math.hypot(MeadowToEmber.x, MeadowToEmber.y);
+  const SurfaceDistance = WorldDefinitions[0].radius + SeedRadius + 0.03;
+  const StartingPosition = createVector(
+    WorldDefinitions[0].position.x + ((MeadowToEmber.x / MeadowToEmberLength) * SurfaceDistance),
+    WorldDefinitions[0].position.y + ((MeadowToEmber.y / MeadowToEmberLength) * SurfaceDistance),
+    0,
+  );
+  const LaunchAngleRadians = 20 * (Math.PI / 180);
+  const LaunchVelocity = createVector(
+    Math.cos(LaunchAngleRadians) * 4.25,
+    Math.sin(LaunchAngleRadians) * 4.25,
+    0,
+  );
+
+  const Prediction = predictTrajectory(
+    StartingPosition,
+    LaunchVelocity,
+    WorldDefinitions,
+    {
+      seedRadius: SeedRadius,
+      fixedStepSeconds: FixedStepSeconds,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'meadow',
+      collisionBodyDefinitions: SeedstoneDefinitions,
+      startTimeSeconds: 0,
+    },
+  );
+
+  let LiveState = { position: StartingPosition, velocity: LaunchVelocity };
+  let IgnoredWorldIdentifier = 'meadow';
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 520; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, WorldDefinitions, FixedStepSeconds);
+    if (IgnoredWorldIdentifier) {
+      const ClearDistance = WorldDefinitions[0].radius + SeedRadius + 0.35;
+      if (
+        calculateDistanceSquared(LiveState.position, WorldDefinitions[0].position)
+        > (ClearDistance * ClearDistance)
+      ) {
+        IgnoredWorldIdentifier = null;
+      }
+    }
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      SeedRadius,
+      SeedstoneDefinitions,
+      StepIndex * FixedStepSeconds,
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(Prediction.collisionKind, 'seedstone');
+  assert.equal(Prediction.collisionBodyIdentifier, 'seedstone');
+  assert.equal(LiveCollision?.definition.id, 'seedstone');
+  assert.equal(LiveCollisionStep, Prediction.points.length - 1);
+});
+
+test('waiting changes an authored Tide-to-Frost asteroid shot from danger to landing', () => {
+  const WorldDefinitions = [
+    { id: 'meadow', position: createVector(-8, -6.4, 0), radius: 3.35, gravitationalParameter: 92 },
+    { id: 'ember', position: createVector(7.8, -3.3, 0), radius: 3, gravitationalParameter: 82 },
+    { id: 'grove', position: createVector(-8.8, 3, 0), radius: 2.05, gravitationalParameter: 44 },
+    { id: 'frost', position: createVector(0.7, 8, 0), radius: 3.55, gravitationalParameter: 102 },
+    { id: 'tide', position: createVector(9.7, 6, 0), radius: 2.15, gravitationalParameter: 48 },
+  ];
+  const AsteroidDefinitions = [{
+    id: 'wayfarer',
+    kind: 'hazard',
+    radius: 0.66,
+    orbit: {
+      centre: createVector(0.7, 8, 0),
+      radius: 5.35,
+      phaseRadians: -1.18,
+      angularSpeedRadiansPerSecond: 0.34,
+    },
+  }];
+  const TideToFrost = createVector(-9, 2, 0);
+  const TideToFrostLength = Math.hypot(TideToFrost.x, TideToFrost.y);
+  const StartingPosition = createVector(
+    9.7 + ((TideToFrost.x / TideToFrostLength) * (2.15 + 0.46 + 0.03)),
+    6 + ((TideToFrost.y / TideToFrostLength) * (2.15 + 0.46 + 0.03)),
+    0,
+  );
+  const LaunchAngleRadians = 4 * (Math.PI / 180);
+  const LaunchVelocity = createVector(
+    Math.cos(LaunchAngleRadians) * 4.75,
+    Math.sin(LaunchAngleRadians) * 4.75,
+    0,
+  );
+  const createPredictionSettings = (StartTimeSeconds) => ({
+    seedRadius: 0.46,
+    fixedStepSeconds: 1 / 120,
+    maximumSteps: 520,
+    ignoredWorldIdentifier: 'tide',
+    collisionBodyDefinitions: AsteroidDefinitions,
+    startTimeSeconds: StartTimeSeconds,
+  });
+
+  const ImmediatePrediction = predictTrajectory(
+    StartingPosition,
+    LaunchVelocity,
+    WorldDefinitions,
+    createPredictionSettings(0),
+  );
+  const WaitedPrediction = predictTrajectory(
+    StartingPosition,
+    LaunchVelocity,
+    WorldDefinitions,
+    createPredictionSettings(4),
+  );
+
+  assert.equal(ImmediatePrediction.collisionKind, 'hazard');
+  assert.equal(ImmediatePrediction.collisionBodyIdentifier, 'wayfarer');
+  assert.equal(WaitedPrediction.collisionKind, 'world');
+  assert.equal(WaitedPrediction.collisionWorldIdentifier, 'frost');
 });
 
 test('the opening Meadow shot predicts and reaches Ember on the same fixed step', () => {

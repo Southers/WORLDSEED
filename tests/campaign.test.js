@@ -77,6 +77,13 @@ test('landing order changes the next suggested route geometry', () => {
 
 test('system completion counts only objective worlds', () => {
   const WorldDefinitions = createFirstLightDefinitions();
+  WorldDefinitions.push({
+    id: 'seedstone',
+    label: 'SEEDSTONE',
+    position: { x: 0, y: -0.5, z: 0 },
+    restored: true,
+    countsTowardRestoration: false,
+  });
   assert.equal(countRestoredWorlds(WorldDefinitions), 0);
   assert.equal(isSystemRestored(WorldDefinitions), false);
 

@@ -228,7 +228,8 @@ button {
   pointer-events: none;
 }
 
-.route-label {
+.route-label,
+.tactical-label {
   position: absolute;
   transform: translate(-50%, -50%);
   padding: 4px 8px;
@@ -243,7 +244,27 @@ button {
   backdrop-filter: blur(8px);
 }
 
-.route-label:empty {
+.tactical-label {
+  padding: 3px 7px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.tactical-label--seedstone {
+  border-color: rgba(114, 217, 255, 0.38);
+  color: #a8eaff;
+  box-shadow: 0 0 18px rgba(114, 217, 255, 0.14);
+}
+
+.tactical-label--hazard {
+  border-color: rgba(255, 118, 109, 0.34);
+  color: #ffaca6;
+  box-shadow: 0 0 18px rgba(255, 118, 109, 0.12);
+}
+
+.route-label:empty,
+.tactical-label:empty {
   display: none;
 }
 
