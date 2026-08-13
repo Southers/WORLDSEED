@@ -70,6 +70,15 @@ npm test
 npm run check
 ```
 
+## Validate the release package
+
+The local audit verifies required release files, versioned internal URLs, credits, copy and all three 1200×600 submission images. The online audit additionally checks the deployed page, main module and public thumbnail.
+
+```bash
+npm run release:check
+npm run release:online
+```
+
 ## Controls
 
 - Drag backwards from the seed and release to launch.
