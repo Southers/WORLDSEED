@@ -88,9 +88,9 @@ npm run release:online
 - `M` toggles all audio.
 - The Reset button provides the same action on touch devices.
 
-## Development boundary
+## Submission approval boundary
 
-WORLDSEED must not be submitted to a jam, competition, gallery, store, form or other external entry surface without a separate explicit future instruction from the user. Updating the existing public development build for approved playtesting is not permission to submit or announce the game.
+Submission preparation is part of the roadmap: keep the public build, credits, entry copy and showcase media current. The final external Submit or Publish action must never be triggered without the user's explicit confirmation at that moment.
 
 ## Project guide
 
@@ -98,4 +98,4 @@ WORLDSEED must not be submitted to a jam, competition, gallery, store, form or o
 - `DESIGN.md` defines the player promise, core loop and scope.
 - `JAM_PLAN.md` defines the campaign milestones, validation gates and cut order.
 - `CREDITS.md` tracks every external dependency and asset.
-- `SUBMISSION.md` is an archived reference package and must not be acted on without a separate explicit instruction.
+- `SUBMISSION.md` is the working entry package and final user-approval checklist.

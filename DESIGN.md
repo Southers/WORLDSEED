@@ -163,6 +163,6 @@ Do not add a mid-flight action until branching routes and predictable obstacles 
 - The complete affected journey runs reliably on modern desktop and mobile browsers.
 - The final Worldheart restoration clearly resolves the emotional and mechanical journey.
 
-## Explicit non-goal
+## Submission handoff
 
-Development and playtesting do not authorise submission. WORLDSEED must not be entered into a jam, competition, form, gallery, store or other external submission surface without a separate explicit future instruction from the user.
+Submission readiness is part of finishing the game: keep its public build, credits, copy, screenshots, showcase video and release evidence current. The final external submission or publication remains a user-controlled action. An agent may prepare and explain the entry, but must receive explicit confirmation at the final Submit or Publish step before triggering it.

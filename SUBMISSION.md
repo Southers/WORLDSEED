@@ -1,6 +1,6 @@
-# WORLDSEED Archived Submission Reference
+# WORLDSEED Submission Working Package
 
-> **DO NOT SUBMIT OR PUBLISH THIS MATERIAL.** It is retained only as a historical reference and capture archive. No jam entry, form, gallery listing, store page, announcement or other external publication is authorised without a separate explicit future instruction from the user.
+> **FINAL APPROVAL REQUIRED:** Keep this package current and use it to prepare the entry, but do not trigger the final external Submit or Publish action without the user's explicit confirmation at that moment.
 
 ## Links
 
@@ -20,7 +20,7 @@ Slingshot a living seed through the gravity wells of three tiny planets and awak
 
 WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, and land on Meadow, Ember and Frost to send life racing around each tiny planet.
 
-## Archived long-form description
+## Long-form description
 
 ### Bring the little worlds back to life
 
@@ -62,12 +62,21 @@ The tiny worlds are both the subject and the mechanic. Their curved surfaces cre
 
 ## Showcase clip
 
-`submission/worldseed-showcase.mp4` is a silent 10.5-second, 1200×600 H.264 progression from the dormant opening through Ember's awakening to the restored-system victory. It is assembled only from authentic game captures and retained for internal review.
+`submission/worldseed-showcase.mp4` is a silent 10.5-second, 1200×600 H.264 progression from the dormant opening through Ember's awakening to the restored-system victory. It is assembled only from authentic game captures and retained as the current review clip.
 
-## External-action safeguard
+## Preparation checklist
 
-- The public link exists for development playtesting only.
-- These images, copy and video must not be uploaded to an external entry surface.
-- A future submission requires a new, explicit user instruction; the development goal never implies permission.
+- [ ] Confirm the current submission fields, rules, deadline and media requirements.
+- [ ] Refresh the title, descriptions and Tiny Worlds explanation against the completed campaign.
+- [ ] Verify the public URL from a clean desktop and mobile browser.
+- [ ] Run `npm test`, `npm run check` and `npm run release:online`.
+- [ ] Confirm the source repository is public and `CREDITS.md` is current.
+- [ ] Refresh the thumbnail, screenshots and showcase clip from the final build.
+- [ ] Prepare every form field and present the final entry to the user for review.
 
-External publication status: **prohibited**
+## Final action
+
+- [ ] Obtain the user's explicit confirmation at the final Submit or Publish step.
+- [ ] Only after that confirmation, trigger the external action and record the published URL.
+
+Published submission URL: _pending_
