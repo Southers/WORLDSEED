@@ -149,6 +149,55 @@ button {
   transform: translate(-50%, 8px);
 }
 
+.aim-panel {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: 144px;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto minmax(90px, 150px) 34px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(5, 12, 20, 0.66);
+  color: rgba(230, 240, 245, 0.7);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+
+.aim-panel[hidden] {
+  display: none;
+}
+
+.aim-panel.is-locked {
+  border-color: rgba(190, 246, 163, 0.35);
+  color: #dffbd2;
+  box-shadow: 0 0 24px rgba(141, 204, 112, 0.12);
+}
+
+.aim-panel__meter {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.aim-panel__fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8dcc70, #e9f9b9);
+  box-shadow: 0 0 10px rgba(188, 236, 168, 0.5);
+  transition: width 40ms linear;
+}
+
 .status-toast {
   position: absolute;
   z-index: 6;
@@ -237,5 +286,9 @@ button {
 
   .instruction-panel {
     bottom: max(62px, calc(env(safe-area-inset-bottom) + 56px));
+  }
+
+  .aim-panel {
+    bottom: max(126px, calc(env(safe-area-inset-bottom) + 120px));
   }
 }

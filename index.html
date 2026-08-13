@@ -37,8 +37,16 @@
     </header>
 
     <section id="InstructionPanel" class="instruction-panel">
-      <strong id="InstructionTitle">Drag the seed backwards</strong>
-      <span id="InstructionBody">Release to launch. Let gravity do the rest.</span>
+      <strong id="InstructionTitle">Grab the glowing seed</strong>
+      <span id="InstructionBody">Pull away from EMBER, then release.</span>
+    </section>
+
+    <section id="AimPanel" class="aim-panel" hidden aria-live="polite">
+      <span id="AimLabel">PULL</span>
+      <span class="aim-panel__meter" aria-hidden="true">
+        <span id="AimPowerFill" class="aim-panel__fill"></span>
+      </span>
+      <span id="AimPowerValue">0%</span>
     </section>
 
     <section id="StatusToast" class="status-toast" aria-live="polite"></section>

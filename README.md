@@ -10,6 +10,16 @@ The committed jam scope is one polished journey across Meadow, Ember and Frost.
 
 The current `main` build is deployed at **https://southers.github.io/WORLDSEED/**.
 
+### Release smoke test
+
+Use a clean browser at a desktop viewport and again at a portrait mobile viewport:
+
+1. Confirm the title, three worlds, glowing seed and first-shot pull guide render without console errors.
+2. Drag the seed away from Ember until the landing ring appears, then release; confirm Ember awakens.
+3. Launch into empty space; confirm the seed returns to its last world in under one second after leaving the play area.
+4. Use Reset (and `R` on desktop); confirm the counter, worlds and opening seed position reset.
+5. Awaken Ember and Frost; confirm the `2 / 2` counter and victory panel, then use Play again.
+
 ## Current checkpoint
 
 `main` begins with a preserved Day 1 gameplay proof:
