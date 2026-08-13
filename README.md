@@ -87,3 +87,4 @@ This project is built from scratch for the August 2026 Three.js Tiny Worlds game
 - `DESIGN.md` defines the player promise, core loop and scope.
 - `JAM_PLAN.md` defines the five-day execution and cut plan.
 - `CREDITS.md` tracks every external dependency and asset.
+- `SUBMISSION.md` contains paste-ready jam copy, links, screenshot mapping and the final submission checklist.
