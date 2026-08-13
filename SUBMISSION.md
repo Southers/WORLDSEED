@@ -61,11 +61,16 @@ The tiny worlds are both the subject and the mechanic. Their curved surfaces cre
 2. `submission/opening.png` — 1200×600 opening composition showing all three worlds and the seed.
 3. `submission/victory.png` — 1200×600 final restored system and victory payoff.
 
+## Showcase clip
+
+`submission/worldseed-showcase.mp4` is a silent 10.5-second, 1200×600 H.264 progression from the dormant opening through Ember's awakening to the restored-system victory. It is assembled only from the authentic submission captures and is ready for upload where the entry page or social post accepts video.
+
 ## Final form checklist
 
 - [ ] Confirm the official 2026 form fields and rules when the event page becomes available.
 - [ ] Use the exact title, public play URL and source URL above.
 - [ ] Upload `submission/thumbnail.png` without further scaling if the expected size is 1200×600.
+- [ ] Upload `submission/worldseed-showcase.mp4` where an optional gameplay/showcase clip is accepted.
 - [ ] Paste the full description or the short description if a character limit applies.
 - [ ] Confirm the public URL works in a clean browser with no login.
 - [ ] Run `npm run release:online` and retain the passing output with the final regression notes.

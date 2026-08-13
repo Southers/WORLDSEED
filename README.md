@@ -72,7 +72,7 @@ npm run check
 
 ## Validate the release package
 
-The local audit verifies required release files, versioned internal URLs, credits, copy and all three 1200×600 submission images. The online audit additionally checks the deployed page, main module and public thumbnail.
+The local audit verifies required release files, versioned internal URLs, credits, copy, all three 1200×600 submission images and the H.264 showcase clip. The online audit additionally checks the deployed page, runtime modules, public thumbnail and public clip MIME types.
 
 ```bash
 npm run release:check

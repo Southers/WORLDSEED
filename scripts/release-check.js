@@ -29,6 +29,9 @@ const RequiredSubmissionImages = [
   'submission/thumbnail.png',
   'submission/victory.png',
 ];
+const RequiredSubmissionVideos = [
+  'submission/worldseed-showcase.mp4',
+];
 
 function repositoryPath(RelativePath) {
   return join(RepositoryRoot, ...RelativePath.split('/'));
@@ -50,6 +53,13 @@ function readPngDimensions(PngBuffer, Label) {
     width: PngBuffer.readUInt32BE(16),
     height: PngBuffer.readUInt32BE(20),
   };
+}
+
+function verifyMp4(Mp4Buffer, Label) {
+  assert.ok(Mp4Buffer.length >= 100_000, `${Label} must contain a useful showcase clip`);
+  assert.ok(Mp4Buffer.length <= 20_000_000, `${Label} must remain submission-friendly`);
+  assert.equal(Mp4Buffer.subarray(4, 8).toString('ascii'), 'ftyp', `${Label} must be an MP4`);
+  assert.ok(Mp4Buffer.includes(Buffer.from('avc1')), `${Label} must contain H.264 video`);
 }
 
 function requireText(Text, ExpectedText, Label) {
@@ -74,6 +84,10 @@ async function verifyLocalRelease() {
       { width: 1200, height: 600 },
       `${RelativePath} must be exactly 1200×600`,
     );
+  }
+
+  for (const RelativePath of RequiredSubmissionVideos) {
+    verifyMp4(await readRequiredFile(RelativePath), RelativePath);
   }
 
   const IndexHtml = TextByPath.get('index.html');
@@ -119,6 +133,7 @@ async function verifyLocalRelease() {
   requireText(SubmissionMarkdown, PublicGameUrl, 'SUBMISSION.md');
   requireText(SubmissionMarkdown, 'https://github.com/Southers/WORLDSEED', 'SUBMISSION.md');
   requireText(SubmissionMarkdown, 'Theme: Tiny Worlds', 'SUBMISSION.md');
+  requireText(SubmissionMarkdown, 'submission/worldseed-showcase.mp4', 'SUBMISSION.md');
   requireText(SubmissionMarkdown, 'Published submission URL: _pending_', 'SUBMISSION.md');
 
   const CreditsMarkdown = TextByPath.get('CREDITS.md');
@@ -129,6 +144,7 @@ async function verifyLocalRelease() {
   return {
     images: RequiredSubmissionImages.length,
     textFiles: RequiredTextFiles.length,
+    videos: RequiredSubmissionVideos.length,
   };
 }
 
@@ -182,11 +198,21 @@ async function verifyOnlineRelease() {
     'Public thumbnail must be exactly 1200×600',
   );
 
+  const ShowcaseUrl = new URL('submission/worldseed-showcase.mp4', PublicGameUrl);
+  ShowcaseUrl.searchParams.set('release-check', String(Date.now()));
+  const ShowcaseResponse = await fetch(ShowcaseUrl, { cache: 'no-store' });
+  assert.ok(ShowcaseResponse.ok, `Public showcase returned HTTP ${ShowcaseResponse.status}`);
+  const ShowcaseContentType = ShowcaseResponse.headers.get('content-type') ?? '';
+  assert.match(ShowcaseContentType, /^video\/mp4\b/i, 'Public showcase must use video/mp4');
+  verifyMp4(Buffer.from(await ShowcaseResponse.arrayBuffer()), 'public showcase');
+
   return {
     buildMarker: PublicMainJavaScript.match(/dataset\.build = '([^']+)'/)?.[1] ?? 'unknown',
     coreStatus: CoreResponse.status,
     pageStatus: PageResponse.status,
     runtimeStatus: RuntimeResponse.status,
+    showcaseContentType: ShowcaseContentType,
+    showcaseStatus: ShowcaseResponse.status,
     thumbnailContentType: ThumbnailContentType,
     thumbnailStatus: ThumbnailResponse.status,
   };
@@ -197,9 +223,11 @@ const LocalEvidence = await verifyLocalRelease();
 const OnlineEvidence = IsOnlineCheckRequested ? await verifyOnlineRelease() : null;
 
 console.log('WORLDSEED release audit passed.');
-console.log(`Local package: ${LocalEvidence.textFiles} required files, ${LocalEvidence.images} screenshots.`);
+console.log(
+  `Local package: ${LocalEvidence.textFiles} required files, ${LocalEvidence.images} screenshots, ${LocalEvidence.videos} showcase video.`,
+);
 if (OnlineEvidence) {
   console.log(
-    `Public build: HTTP ${OnlineEvidence.pageStatus}, runtime/core HTTP ${OnlineEvidence.runtimeStatus}/${OnlineEvidence.coreStatus}, thumbnail HTTP ${OnlineEvidence.thumbnailStatus} ${OnlineEvidence.thumbnailContentType}, marker ${OnlineEvidence.buildMarker}.`,
+    `Public build: HTTP ${OnlineEvidence.pageStatus}, runtime/core HTTP ${OnlineEvidence.runtimeStatus}/${OnlineEvidence.coreStatus}, thumbnail HTTP ${OnlineEvidence.thumbnailStatus} ${OnlineEvidence.thumbnailContentType}, showcase HTTP ${OnlineEvidence.showcaseStatus} ${OnlineEvidence.showcaseContentType}, marker ${OnlineEvidence.buildMarker}.`,
   );
 }
