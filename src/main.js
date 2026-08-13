@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260813-7a';
+import { WorldseedAudio } from './audio.js?v=20260813-7b';
 
 import {
   countRestoredWorlds,
   getRestorableWorlds,
   getRouteChoices,
+  getTrajectoryPickupIdentifiers,
   isSystemRestored,
-} from './campaign.js?v=20260813-7a';
+} from './campaign.js?v=20260813-7b';
 
 import {
   calculateBodyPositionAtTime,
@@ -17,12 +18,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260813-7a';
+} from './physics.js?v=20260813-7b';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260813-7a';
+} from './restoration.js?v=20260813-7b';
 
 /**
  * WORLDSEED — First Light branching-system prototype.
@@ -35,6 +36,7 @@ import {
 
 const GameCanvas = document.querySelector('#GameCanvas');
 const WorldCounterElement = document.querySelector('#WorldCounter');
+const StardustCounterElement = document.querySelector('#StardustCounter');
 const InstructionPanelElement = document.querySelector('#InstructionPanel');
 const InstructionTitleElement = document.querySelector('#InstructionTitle');
 const InstructionBodyElement = document.querySelector('#InstructionBody');
@@ -49,7 +51,7 @@ const VictoryPanelElement = document.querySelector('#VictoryPanel');
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260813-7a';
+GameCanvas.dataset.build = '20260813-7b';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -62,6 +64,8 @@ const MaximumTrajectoryPredictionSteps = 520;
 const OutOfBoundsDistance = 34;
 const StartingWorldIdentifier = 'meadow';
 const MaximumDrawCallBudget = 180;
+const StardustPickupRadius = 0.22;
+const StardustCollectionRadius = SeedRadius + StardustPickupRadius;
 const MinimumAdaptivePixelRatio = 1;
 
 const Scene = new THREE.Scene();
@@ -124,6 +128,7 @@ let ImpactPulseLifeSeconds = 0;
 let CameraImpactLifeSeconds = 0;
 let SeedstoneUsesRemaining = 1;
 let SeedstoneCrumbleStartedAtSeconds = null;
+let PredictedStardustIdentifiers = new Set();
 let SeedPhysicsState = {
   position: createVector(),
   velocity: createVector(),
@@ -265,6 +270,11 @@ const AsteroidDefinition = {
 };
 const TacticalBodyDefinitions = [SeedstoneDefinition, AsteroidDefinition];
 const CampaignNodeDefinitions = [...WorldDefinitions, SeedstoneDefinition];
+const StardustDefinitions = [
+  { id: 'first-light-arc-1', position: createVector(-1.56, -2.72, 0), collected: false },
+  { id: 'first-light-arc-2', position: createVector(-1.20, -0.45, 0), collected: false },
+  { id: 'first-light-arc-3', position: createVector(-0.99, 1.45, 0), collected: false },
+];
 
 const WorldRuntimeByIdentifier = new Map();
 const DeadWorldColor = new THREE.Color(0x575d60);
@@ -1473,6 +1483,32 @@ const AsteroidOrbitMaterial = new THREE.LineBasicMaterial({
 const AsteroidOrbitLine = new THREE.LineLoop(AsteroidOrbitGeometry, AsteroidOrbitMaterial);
 Scene.add(AsteroidOrbitLine);
 
+/** Three optional motes trace one expressive Meadow-to-Frost mastery arc. */
+const StardustGeometry = new THREE.OctahedronGeometry(StardustPickupRadius, 0);
+const StardustMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.88,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  toneMapped: false,
+});
+const StardustBaseColor = new THREE.Color(0x82dfff);
+const StardustPredictedColor = new THREE.Color(0xffef9b);
+const StardustMesh = new THREE.InstancedMesh(
+  StardustGeometry,
+  StardustMaterial,
+  StardustDefinitions.length,
+);
+const StardustTransform = new THREE.Object3D();
+StardustMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+StardustMesh.frustumCulled = false;
+for (let StardustIndex = 0; StardustIndex < StardustDefinitions.length; StardustIndex += 1) {
+  StardustMesh.setColorAt(StardustIndex, StardustBaseColor);
+}
+StardustMesh.instanceColor.needsUpdate = true;
+Scene.add(StardustMesh);
+
 /** The seed is intentionally bright and oversized enough to remain readable on mobile. */
 const SeedGroup = new THREE.Group();
 const SeedCoreGeometry = new THREE.IcosahedronGeometry(SeedRadius, 2);
@@ -1861,6 +1897,100 @@ function updateTacticalBodies(ElapsedTimeSeconds) {
   }
 }
 
+/** Updates the optional Arc mastery counter. */
+function updateStardustCounter() {
+  const CollectedStardustCount = StardustDefinitions.filter(
+    (StardustDefinition) => StardustDefinition.collected,
+  ).length;
+  StardustCounterElement.textContent = `${CollectedStardustCount} / ${StardustDefinitions.length}`;
+  StardustCounterElement.closest('.counter__mastery')?.classList.toggle(
+    'is-complete',
+    CollectedStardustCount === StardustDefinitions.length,
+  );
+}
+
+/** Collects any optional stardust touched by the live fixed-step seed position. */
+function collectStardustAtPosition(SeedPosition) {
+  let NewlyCollectedCount = 0;
+  for (const StardustDefinition of StardustDefinitions) {
+    if (
+      StardustDefinition.collected
+      || calculateDistanceSquared(SeedPosition, StardustDefinition.position)
+        > (StardustCollectionRadius * StardustCollectionRadius)
+    ) {
+      continue;
+    }
+
+    StardustDefinition.collected = true;
+    NewlyCollectedCount += 1;
+  }
+
+  if (NewlyCollectedCount === 0) {
+    return;
+  }
+
+  const CollectedStardustCount = StardustDefinitions.filter(
+    (StardustDefinition) => StardustDefinition.collected,
+  ).length;
+  updateStardustCounter();
+  WorldseedSound.stardust(
+    CollectedStardustCount,
+    StardustDefinitions.length,
+  );
+  if (CollectedStardustCount === StardustDefinitions.length) {
+    showStatusToast('ARC COMPLETE · 3 / 3', 1200);
+  } else {
+    showStatusToast(
+      `STARDUST ${CollectedStardustCount} / ${StardustDefinitions.length}`,
+      620,
+    );
+  }
+}
+
+/** Animates uncollected motes and brightens those intersected by the current prediction. */
+function updateStardustVisuals(ElapsedTimeSeconds) {
+  const ShouldShowStardust = ![
+    'restoring',
+    'victoryPending',
+    'victory',
+  ].includes(GamePhase);
+  let HasVisibleStardust = false;
+
+  for (let StardustIndex = 0; StardustIndex < StardustDefinitions.length; StardustIndex += 1) {
+    const StardustDefinition = StardustDefinitions[StardustIndex];
+    const IsPredictedPickup = PredictedStardustIdentifiers.has(StardustDefinition.id);
+    const PulseScale = 0.9 + (Math.sin(
+      (ElapsedTimeSeconds * 5.2) + (StardustIndex * 1.7),
+    ) * 0.14);
+    const StardustScale = StardustDefinition.collected
+      ? 0
+      : PulseScale * (IsPredictedPickup ? 1.55 : 1);
+    HasVisibleStardust ||= !StardustDefinition.collected;
+
+    StardustTransform.position.set(
+      StardustDefinition.position.x,
+      StardustDefinition.position.y,
+      0.24,
+    );
+    StardustTransform.rotation.set(
+      ElapsedTimeSeconds * (0.8 + (StardustIndex * 0.12)),
+      ElapsedTimeSeconds * (1.1 + (StardustIndex * 0.09)),
+      ElapsedTimeSeconds * 0.7,
+    );
+    StardustTransform.scale.setScalar(StardustScale);
+    StardustTransform.updateMatrix();
+    StardustMesh.setMatrixAt(StardustIndex, StardustTransform.matrix);
+    StardustMesh.setColorAt(
+      StardustIndex,
+      IsPredictedPickup ? StardustPredictedColor : StardustBaseColor,
+    );
+  }
+
+  StardustMesh.instanceMatrix.needsUpdate = true;
+  StardustMesh.instanceColor.needsUpdate = true;
+  StardustMesh.visible = ShouldShowStardust && HasVisibleStardust;
+}
+
 /**
  * Computes a stable resting point on a world's surface.
  *
@@ -2105,6 +2235,7 @@ function clearTrajectoryPreview() {
   TrajectoryLine.visible = false;
   LandingMarkerMesh.visible = false;
   TrajectoryGeometry.setDrawRange(0, 0);
+  PredictedStardustIdentifiers.clear();
 }
 
 /**
@@ -2150,6 +2281,14 @@ function updateAimPreview(CurrentPointerWorldPosition) {
       startTimeSeconds: PhysicsElapsedTimeSeconds,
     },
   );
+  PredictedStardustIdentifiers.clear();
+  for (const StardustIdentifier of getTrajectoryPickupIdentifiers(
+    TrajectoryPrediction.points,
+    StardustDefinitions,
+    StardustCollectionRadius,
+  )) {
+    PredictedStardustIdentifiers.add(StardustIdentifier);
+  }
 
   /** Downsample the fixed-step prediction so a small line buffer remains cheap on mobile. */
   const PreviewSampleStride = 4;
@@ -2268,6 +2407,9 @@ function updateAimPreview(CurrentPointerWorldPosition) {
       'No landing yet',
       'Pull farther or change the angle until the path turns gold, green or blue.',
     );
+  }
+  if (PredictedStardustIdentifiers.size > 0) {
+    AimLabelElement.textContent += ` · ARC +${PredictedStardustIdentifiers.size}`;
   }
   WorldseedSound.updateAim(
     PowerRatio,
@@ -2433,6 +2575,7 @@ function simulateSeedFixedStep() {
     WorldDefinitions,
     FixedPhysicsStepSeconds,
   );
+  collectStardustAtPosition(SeedPhysicsState.position);
 
   if (LaunchIgnoredWorldIdentifier) {
     const StartingWorldDefinition = getWorldDefinition(LaunchIgnoredWorldIdentifier);
@@ -2976,6 +3119,10 @@ function resetGame() {
   LaunchIgnoredBodyIdentifier = null;
   SeedstoneUsesRemaining = 1;
   SeedstoneCrumbleStartedAtSeconds = null;
+  for (const StardustDefinition of StardustDefinitions) {
+    StardustDefinition.collected = false;
+  }
+  PredictedStardustIdentifiers.clear();
   GamePhase = 'attached';
   PhysicsAccumulatorSeconds = 0;
   PhysicsElapsedTimeSeconds = 0;
@@ -3001,6 +3148,7 @@ function resetGame() {
   PullGuideLine.visible = true;
 
   updateWorldCounter();
+  updateStardustCounter();
   updateTargetBeacons(0);
   const OpeningRouteChoices = getRouteChoices(
     CampaignNodeDefinitions,
@@ -3035,6 +3183,7 @@ function renderFrame() {
   updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateCamera(DeltaTimeSeconds);
   updateTacticalBodies(ElapsedTimeSeconds);
+  updateStardustVisuals(ElapsedTimeSeconds);
   updateRouteLabels();
   updateFlightAudio();
 

@@ -114,6 +114,25 @@ button {
   font-weight: 800;
 }
 
+.counter__divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.counter__mastery {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: #a9e9ff;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.counter__mastery.is-complete {
+  color: #ffec9e;
+  text-shadow: 0 0 14px rgba(255, 221, 120, 0.4);
+}
+
 .instruction-panel {
   position: absolute;
   z-index: 4;

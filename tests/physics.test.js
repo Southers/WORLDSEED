@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { getTrajectoryPickupIdentifiers } from '../src/campaign.js';
+
 import {
   calculateBodyPositionAtTime,
   calculateDistanceSquared,
@@ -232,6 +234,71 @@ test('First Light Seedstone is reachable with matching prediction and live fligh
   assert.equal(Prediction.collisionBodyIdentifier, 'seedstone');
   assert.equal(LiveCollision?.definition.id, 'seedstone');
   assert.equal(LiveCollisionStep, Prediction.points.length - 1);
+});
+
+test('the authored First Light Arc collects all stardust and lands on Frost', () => {
+  const WorldDefinitions = [
+    { id: 'meadow', position: createVector(-8, -6.4, 0), radius: 3.35, gravitationalParameter: 92 },
+    { id: 'ember', position: createVector(7.8, -3.3, 0), radius: 3, gravitationalParameter: 82 },
+    { id: 'grove', position: createVector(-8.8, 3, 0), radius: 2.05, gravitationalParameter: 44 },
+    { id: 'frost', position: createVector(0.7, 8, 0), radius: 3.55, gravitationalParameter: 102 },
+    { id: 'tide', position: createVector(9.7, 6, 0), radius: 2.15, gravitationalParameter: 48 },
+  ];
+  const TacticalBodyDefinitions = [
+    {
+      id: 'seedstone',
+      kind: 'seedstone',
+      position: createVector(0.15, -0.55, 0),
+      radius: 0.72,
+    },
+    {
+      id: 'wayfarer',
+      kind: 'hazard',
+      radius: 0.66,
+      orbit: {
+        centre: createVector(0.7, 8, 0),
+        radius: 5.35,
+        phaseRadians: -1.18,
+        angularSpeedRadiansPerSecond: 0.34,
+      },
+    },
+  ];
+  const StardustDefinitions = [
+    { id: 'first-light-arc-1', position: createVector(-1.56, -2.72, 0), collected: false },
+    { id: 'first-light-arc-2', position: createVector(-1.20, -0.45, 0), collected: false },
+    { id: 'first-light-arc-3', position: createVector(-0.99, 1.45, 0), collected: false },
+  ];
+  const MeadowToEmber = createVector(15.8, 3.1, 0);
+  const MeadowToEmberLength = Math.hypot(MeadowToEmber.x, MeadowToEmber.y);
+  const StartingPosition = createVector(
+    -8 + ((MeadowToEmber.x / MeadowToEmberLength) * (3.35 + 0.46 + 0.03)),
+    -6.4 + ((MeadowToEmber.y / MeadowToEmberLength) * (3.35 + 0.46 + 0.03)),
+    0,
+  );
+  const LaunchAngleRadians = 23 * (Math.PI / 180);
+  const Prediction = predictTrajectory(
+    StartingPosition,
+    createVector(
+      Math.cos(LaunchAngleRadians) * 4.125,
+      Math.sin(LaunchAngleRadians) * 4.125,
+      0,
+    ),
+    WorldDefinitions,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: 1 / 120,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'meadow',
+      collisionBodyDefinitions: TacticalBodyDefinitions,
+      startTimeSeconds: 0,
+    },
+  );
+
+  assert.equal(Prediction.collisionWorldIdentifier, 'frost');
+  assert.deepEqual(
+    getTrajectoryPickupIdentifiers(Prediction.points, StardustDefinitions, 0.68).sort(),
+    StardustDefinitions.map((StardustDefinition) => StardustDefinition.id).sort(),
+  );
 });
 
 test('waiting changes an authored Tide-to-Frost asteroid shot from danger to landing', () => {
