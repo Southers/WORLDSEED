@@ -1,26 +1,28 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260813-6a';
+import { WorldseedAudio } from './audio.js?v=20260813-7a';
 
 import {
   countRestoredWorlds,
   getRestorableWorlds,
   getRouteChoices,
   isSystemRestored,
-} from './campaign.js?v=20260813-6a';
+} from './campaign.js?v=20260813-7a';
 
 import {
+  calculateBodyPositionAtTime,
   calculateDistanceSquared,
   createVector,
+  findCollidingBody,
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260813-6a';
+} from './physics.js?v=20260813-7a';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260813-6a';
+} from './restoration.js?v=20260813-7a';
 
 /**
  * WORLDSEED — First Light branching-system prototype.
@@ -42,11 +44,12 @@ const AimPowerFillElement = document.querySelector('#AimPowerFill');
 const AimPowerValueElement = document.querySelector('#AimPowerValue');
 const StatusToastElement = document.querySelector('#StatusToast');
 const RouteLabelElements = [...document.querySelectorAll('.route-label')];
+const TacticalLabelElements = [...document.querySelectorAll('.tactical-label')];
 const VictoryPanelElement = document.querySelector('#VictoryPanel');
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260813-6a';
+GameCanvas.dataset.build = '20260813-7a';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -96,6 +99,7 @@ const SurfaceSwayQuaternion = new THREE.Quaternion();
 const RouteLabelProjection = new THREE.Vector3();
 
 let PhysicsAccumulatorSeconds = 0;
+let PhysicsElapsedTimeSeconds = 0;
 let GameElapsedTimeSeconds = 0;
 let IsPageActive = !document.hidden;
 let IsWebGLContextAvailable = true;
@@ -107,6 +111,7 @@ let MaximumObservedDrawCalls = 0;
 let GamePhase = 'attached';
 let CurrentWorldIdentifier = StartingWorldIdentifier;
 let LaunchIgnoredWorldIdentifier = null;
+let LaunchIgnoredBodyIdentifier = null;
 let IsPointerAiming = false;
 let ActivePointerIdentifier = null;
 let LastSafeSeedPosition = createVector();
@@ -117,6 +122,8 @@ let HasLaunchedOnce = false;
 let LaunchPulseLifeSeconds = 0;
 let ImpactPulseLifeSeconds = 0;
 let CameraImpactLifeSeconds = 0;
+let SeedstoneUsesRemaining = 1;
+let SeedstoneCrumbleStartedAtSeconds = null;
 let SeedPhysicsState = {
   position: createVector(),
   velocity: createVector(),
@@ -232,6 +239,32 @@ const WorldDefinitions = [
     },
   },
 ];
+
+/** Tactical bodies are collision targets but do not count toward world restoration. */
+const SeedstoneDefinition = {
+  id: 'seedstone',
+  label: 'SEEDSTONE',
+  kind: 'seedstone',
+  position: createVector(0.15, -0.55, 0),
+  radius: 0.72,
+  restored: true,
+  countsTowardRestoration: false,
+};
+const AsteroidDefinition = {
+  id: 'wayfarer',
+  label: 'WAYFARER',
+  kind: 'hazard',
+  radius: 0.66,
+  countsTowardRestoration: false,
+  orbit: {
+    centre: createVector(0.7, 8, 0),
+    radius: 5.35,
+    phaseRadians: -1.18,
+    angularSpeedRadiansPerSecond: 0.34,
+  },
+};
+const TacticalBodyDefinitions = [SeedstoneDefinition, AsteroidDefinition];
+const CampaignNodeDefinitions = [...WorldDefinitions, SeedstoneDefinition];
 
 const WorldRuntimeByIdentifier = new Map();
 const DeadWorldColor = new THREE.Color(0x575d60);
@@ -1398,6 +1431,48 @@ TargetBeaconMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 TargetBeaconMesh.frustumCulled = false;
 Scene.add(TargetBeaconMesh);
 
+/** Seedstone and asteroid share one instanced draw call with distinct authored colours. */
+const TacticalBodyGeometry = new THREE.IcosahedronGeometry(SeedstoneDefinition.radius, 2);
+const TacticalBodyMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  roughness: 0.64,
+  metalness: 0.12,
+  emissive: 0x10151c,
+  emissiveIntensity: 0.7,
+});
+const TacticalBodyMesh = new THREE.InstancedMesh(
+  TacticalBodyGeometry,
+  TacticalBodyMaterial,
+  TacticalBodyDefinitions.length,
+);
+const TacticalBodyTransform = new THREE.Object3D();
+TacticalBodyMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+TacticalBodyMesh.frustumCulled = false;
+TacticalBodyMesh.setColorAt(0, new THREE.Color(0x72d9ff));
+TacticalBodyMesh.setColorAt(1, new THREE.Color(0xc88761));
+TacticalBodyMesh.instanceColor.needsUpdate = true;
+Scene.add(TacticalBodyMesh);
+
+/** A restrained orbit guide makes the moving hazard's future path readable. */
+const AsteroidOrbitPoints = [];
+for (let OrbitPointIndex = 0; OrbitPointIndex < 96; OrbitPointIndex += 1) {
+  const OrbitAngle = (OrbitPointIndex / 96) * Math.PI * 2;
+  AsteroidOrbitPoints.push(new THREE.Vector3(
+    AsteroidDefinition.orbit.centre.x + (Math.cos(OrbitAngle) * AsteroidDefinition.orbit.radius),
+    AsteroidDefinition.orbit.centre.y + (Math.sin(OrbitAngle) * AsteroidDefinition.orbit.radius),
+    0.04,
+  ));
+}
+const AsteroidOrbitGeometry = new THREE.BufferGeometry().setFromPoints(AsteroidOrbitPoints);
+const AsteroidOrbitMaterial = new THREE.LineBasicMaterial({
+  color: 0xb96c5c,
+  transparent: true,
+  opacity: 0.18,
+  depthWrite: false,
+});
+const AsteroidOrbitLine = new THREE.LineLoop(AsteroidOrbitGeometry, AsteroidOrbitMaterial);
+Scene.add(AsteroidOrbitLine);
+
 /** The seed is intentionally bright and oversized enough to remain readable on mobile. */
 const SeedGroup = new THREE.Group();
 const SeedCoreGeometry = new THREE.IcosahedronGeometry(SeedRadius, 2);
@@ -1606,9 +1681,16 @@ function getWorldDefinition(WorldIdentifier) {
   return WorldDefinitions.find((WorldDefinition) => WorldDefinition.id === WorldIdentifier);
 }
 
+/** Returns the collision bodies that are active at the current campaign state. */
+function getActiveTacticalBodyDefinitions() {
+  return TacticalBodyDefinitions.filter((BodyDefinition) => (
+    BodyDefinition.kind === 'hazard' || SeedstoneUsesRemaining > 0
+  ));
+}
+
 /** Reveals the nearest useful routes while leaving every physical destination valid. */
 function showRouteChoiceInstruction() {
-  const RouteChoices = getRouteChoices(WorldDefinitions, CurrentWorldIdentifier, 2);
+  const RouteChoices = getRouteChoices(CampaignNodeDefinitions, CurrentWorldIdentifier, 2);
   if (RouteChoices.length === 0) {
     showInstruction('The First Light network is awake', 'The path to the Worldheart is opening.');
     return;
@@ -1632,7 +1714,7 @@ function showRouteChoiceInstruction() {
 function updateTargetBeacons(ElapsedTimeSeconds) {
   const ShouldShowChoices = GamePhase === 'attached';
   const RouteChoices = ShouldShowChoices
-    ? getRouteChoices(WorldDefinitions, CurrentWorldIdentifier, 2)
+    ? getRouteChoices(CampaignNodeDefinitions, CurrentWorldIdentifier, 2)
     : [];
   const PulseScale = 1 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.025);
 
@@ -1661,7 +1743,11 @@ function updateTargetBeacons(ElapsedTimeSeconds) {
 /** Projects suggested world names into the HUD without spending WebGL draw calls. */
 function updateRouteLabels() {
   const RouteChoices = GamePhase === 'attached'
-    ? getRouteChoices(WorldDefinitions, CurrentWorldIdentifier, RouteLabelElements.length)
+    ? getRouteChoices(
+      CampaignNodeDefinitions,
+      CurrentWorldIdentifier,
+      RouteLabelElements.length,
+    )
     : [];
 
   for (let LabelIndex = 0; LabelIndex < RouteLabelElements.length; LabelIndex += 1) {
@@ -1682,6 +1768,94 @@ function updateRouteLabels() {
       (RouteLabelProjection.x * 0.5 + 0.5) * window.innerWidth,
     ) + 'px';
     RouteLabelElement.style.top = Math.round(
+      (-RouteLabelProjection.y * 0.5 + 0.5) * window.innerHeight,
+    ) + 'px';
+  }
+}
+
+/** Updates deterministic tactical-body transforms and their world-space HUD labels. */
+function updateTacticalBodies(ElapsedTimeSeconds) {
+  const ShouldShowTacticalLayer = ![
+    'restoring',
+    'victoryPending',
+    'victory',
+  ].includes(GamePhase);
+  const AsteroidPosition = calculateBodyPositionAtTime(
+    AsteroidDefinition,
+    PhysicsElapsedTimeSeconds,
+  );
+  const SeedstoneScale = SeedstoneUsesRemaining > 0
+    ? 1 + (Math.sin(ElapsedTimeSeconds * 4.4) * 0.045)
+    : Math.max(
+      0,
+      1 - ((ElapsedTimeSeconds - (SeedstoneCrumbleStartedAtSeconds ?? 0)) / 0.55),
+    );
+
+  TacticalBodyTransform.position.set(
+    SeedstoneDefinition.position.x,
+    SeedstoneDefinition.position.y,
+    0.08,
+  );
+  TacticalBodyTransform.rotation.set(
+    ElapsedTimeSeconds * 0.18,
+    ElapsedTimeSeconds * 0.31,
+    ElapsedTimeSeconds * 0.12,
+  );
+  TacticalBodyTransform.scale.setScalar(SeedstoneScale);
+  TacticalBodyTransform.updateMatrix();
+  TacticalBodyMesh.setMatrixAt(0, TacticalBodyTransform.matrix);
+
+  TacticalBodyTransform.position.set(AsteroidPosition.x, AsteroidPosition.y, 0.1);
+  TacticalBodyTransform.rotation.set(
+    ElapsedTimeSeconds * 0.72,
+    ElapsedTimeSeconds * 0.94,
+    ElapsedTimeSeconds * 0.48,
+  );
+  TacticalBodyTransform.scale.setScalar(AsteroidDefinition.radius / SeedstoneDefinition.radius);
+  TacticalBodyTransform.updateMatrix();
+  TacticalBodyMesh.setMatrixAt(1, TacticalBodyTransform.matrix);
+  TacticalBodyMesh.instanceMatrix.needsUpdate = true;
+  TacticalBodyMesh.visible = ShouldShowTacticalLayer;
+  AsteroidOrbitLine.visible = ShouldShowTacticalLayer;
+  AsteroidOrbitMaterial.opacity = 0.14 + (Math.sin(ElapsedTimeSeconds * 1.8) * 0.035);
+
+  const TacticalLabelDefinitions = [
+    SeedstoneUsesRemaining > 0
+      ? { definition: SeedstoneDefinition, position: SeedstoneDefinition.position, text: 'SEEDSTONE · 1 USE' }
+      : null,
+    { definition: AsteroidDefinition, position: AsteroidPosition, text: 'ASTEROID · MOVING' },
+  ];
+  for (let LabelIndex = 0; LabelIndex < TacticalLabelElements.length; LabelIndex += 1) {
+    const TacticalLabelElement = TacticalLabelElements[LabelIndex];
+    const TacticalLabelDefinition = TacticalLabelDefinitions[LabelIndex];
+    if (
+      !ShouldShowTacticalLayer
+      || !TacticalLabelDefinition
+      || GamePhase !== 'attached'
+      || StatusToastElement.classList.contains('is-visible')
+    ) {
+      TacticalLabelElement.textContent = '';
+      continue;
+    }
+
+    RouteLabelProjection.set(
+      TacticalLabelDefinition.position.x,
+      TacticalLabelDefinition.position.y + TacticalLabelDefinition.definition.radius + 0.55,
+      0,
+    ).project(Camera);
+    TacticalLabelElement.textContent = TacticalLabelDefinition.text;
+    const ProjectedLabelX = (
+      (RouteLabelProjection.x * 0.5 + 0.5) * window.innerWidth
+    );
+    const HorizontalLabelMargin = LabelIndex === 1 ? 74 : 62;
+    TacticalLabelElement.style.left = Math.round(
+      THREE.MathUtils.clamp(
+        ProjectedLabelX,
+        HorizontalLabelMargin,
+        window.innerWidth - HorizontalLabelMargin,
+      ),
+    ) + 'px';
+    TacticalLabelElement.style.top = Math.round(
       (-RouteLabelProjection.y * 0.5 + 0.5) * window.innerHeight,
     ) + 'px';
   }
@@ -1821,6 +1995,7 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
 function attachSeedToWorld(WorldDefinition, ImpactPosition) {
   const SurfaceRestPosition = calculateSurfaceRestPosition(WorldDefinition, ImpactPosition);
 
+  ImpactPulseMesh.material.color.set(0xfff2bc);
   ImpactPulseMesh.position.set(ImpactPosition.x, ImpactPosition.y, 0.22);
   ImpactPulseMesh.scale.setScalar(1);
   ImpactPulseMesh.visible = true;
@@ -1856,6 +2031,34 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
     showStatusToast('SAFE LANDING', 700);
     showRouteChoiceInstruction();
   }
+}
+
+/** Lands on the one-use Seedstone without counting it as an awakened world. */
+function attachSeedToSeedstone(ImpactPosition) {
+  const SurfaceRestPosition = calculateSurfaceRestPosition(SeedstoneDefinition, ImpactPosition);
+
+  ImpactPulseMesh.material.color.set(0x72d9ff);
+  ImpactPulseMesh.position.set(ImpactPosition.x, ImpactPosition.y, 0.22);
+  ImpactPulseMesh.scale.setScalar(1);
+  ImpactPulseMesh.visible = true;
+  ImpactPulseLifeSeconds = 0.58;
+  CameraImpactLifeSeconds = 0.18;
+  WorldseedSound.impact('seedstone');
+
+  SeedPhysicsState = {
+    position: SurfaceRestPosition,
+    velocity: createVector(),
+  };
+  SeedGroup.position.set(SurfaceRestPosition.x, SurfaceRestPosition.y, SurfaceRestPosition.z);
+  CurrentWorldIdentifier = SeedstoneDefinition.id;
+  LaunchIgnoredWorldIdentifier = null;
+  LaunchIgnoredBodyIdentifier = null;
+  GamePhase = 'attached';
+  showStatusToast('SEEDSTONE READY · 1 LAUNCH', 1100);
+  showInstruction(
+    'Temporary launchpad',
+    'Choose the next world carefully — the Seedstone crumbles after launch.',
+  );
 }
 
 /**
@@ -1937,7 +2140,14 @@ function updateAimPreview(CurrentPointerWorldPosition) {
       seedRadius: SeedRadius,
       fixedStepSeconds: FixedPhysicsStepSeconds,
       maximumSteps: MaximumTrajectoryPredictionSteps,
-      ignoredWorldIdentifier: CurrentWorldIdentifier,
+      ignoredWorldIdentifier: getWorldDefinition(CurrentWorldIdentifier)
+        ? CurrentWorldIdentifier
+        : null,
+      collisionBodyDefinitions: getActiveTacticalBodyDefinitions(),
+      ignoredCollisionBodyIdentifier: CurrentWorldIdentifier === SeedstoneDefinition.id
+        ? SeedstoneDefinition.id
+        : null,
+      startTimeSeconds: PhysicsElapsedTimeSeconds,
     },
   );
 
@@ -1985,7 +2195,44 @@ function updateAimPreview(CurrentPointerWorldPosition) {
   AimPowerFillElement.style.width = `${PowerPercentage}%`;
   AimPowerValueElement.textContent = `${PowerPercentage}%`;
 
-  if (TrajectoryPrediction.collisionWorldIdentifier) {
+  if (TrajectoryPrediction.collisionKind === 'hazard') {
+    TrajectoryMaterial.color.set(0xff766d);
+    TrajectoryMaterial.opacity = 0.88;
+    LandingMarkerMaterial.color.set(0xff766d);
+    AimPanelElement.classList.remove('is-locked');
+    AimLabelElement.textContent = 'ASTEROID COLLISION';
+    showInstruction(
+      'Red means impact',
+      'Wait for the asteroid to move or change the launch angle.',
+    );
+    LandingMarkerMesh.position.set(FinalPredictionPoint.x, FinalPredictionPoint.y, 0.2);
+    LandingMarkerMesh.visible = true;
+  } else if (TrajectoryPrediction.collisionKind === 'seedstone') {
+    const SeedstonePosition = calculateBodyPositionAtTime(
+      SeedstoneDefinition,
+      TrajectoryPrediction.collisionTimeSeconds,
+    );
+    TrajectoryMaterial.color.set(0x72d9ff);
+    TrajectoryMaterial.opacity = 0.86;
+    LandingMarkerMaterial.color.set(0x72d9ff);
+    AimPanelElement.classList.add('is-locked');
+    AimLabelElement.textContent = 'SEEDSTONE LOCKED';
+    showInstruction(
+      'Release to land on the Seedstone',
+      'Blue means a one-use tactical launchpad. It does not awaken a world.',
+    );
+    const LandingDirection = TemporaryThreeVector.set(
+      FinalPredictionPoint.x - SeedstonePosition.x,
+      FinalPredictionPoint.y - SeedstonePosition.y,
+      0,
+    ).normalize();
+    LandingMarkerMesh.position.set(
+      SeedstonePosition.x + (LandingDirection.x * (SeedstoneDefinition.radius + 0.08)),
+      SeedstonePosition.y + (LandingDirection.y * (SeedstoneDefinition.radius + 0.08)),
+      0.2,
+    );
+    LandingMarkerMesh.visible = true;
+  } else if (TrajectoryPrediction.collisionWorldIdentifier) {
     const LandingWorldDefinition = getWorldDefinition(TrajectoryPrediction.collisionWorldIdentifier);
     const IsNewWorldLanding = !LandingWorldDefinition.restored;
     TrajectoryMaterial.color.set(IsNewWorldLanding ? 0xffd98a : 0xbceca8);
@@ -2017,9 +2264,16 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     LandingMarkerMesh.visible = false;
     AimPanelElement.classList.remove('is-locked');
     AimLabelElement.textContent = 'PULL';
-    showInstruction('No landing yet', 'Pull farther or change the angle until the path turns gold or green.');
+    showInstruction(
+      'No landing yet',
+      'Pull farther or change the angle until the path turns gold, green or blue.',
+    );
   }
-  WorldseedSound.updateAim(PowerRatio, Boolean(TrajectoryPrediction.collisionWorldIdentifier));
+  WorldseedSound.updateAim(
+    PowerRatio,
+    TrajectoryPrediction.collisionKind !== null
+      && TrajectoryPrediction.collisionKind !== 'hazard',
+  );
 }
 
 /**
@@ -2099,7 +2353,14 @@ function handlePointerUp(PointerEventData) {
     AimLaunchVelocity.y,
     0,
   );
-  LaunchIgnoredWorldIdentifier = CurrentWorldIdentifier;
+  const IsLaunchingFromSeedstone = CurrentWorldIdentifier === SeedstoneDefinition.id;
+  LaunchIgnoredWorldIdentifier = IsLaunchingFromSeedstone ? null : CurrentWorldIdentifier;
+  LaunchIgnoredBodyIdentifier = IsLaunchingFromSeedstone ? SeedstoneDefinition.id : null;
+  if (IsLaunchingFromSeedstone) {
+    SeedstoneUsesRemaining = 0;
+    SeedstoneCrumbleStartedAtSeconds = GameElapsedTimeSeconds;
+    showStatusToast('SEEDSTONE SPENT', 650);
+  }
   GamePhase = 'flying';
   HasLaunchedOnce = true;
   LaunchPulseMesh.position.copy(SeedGroup.position);
@@ -2121,7 +2382,7 @@ function handlePointerUp(PointerEventData) {
  * Returns the seed to its last safe world after a miss. Recovery is intentionally fast so
  * experimentation never becomes frustrating.
  */
-function recoverSeedFromVoid() {
+function recoverSeedFromVoid(StatusMessage = 'LOST TO THE VOID') {
   if (GamePhase === 'recovering' || GamePhase === 'victory') {
     return;
   }
@@ -2129,7 +2390,7 @@ function recoverSeedFromVoid() {
   GamePhase = 'recovering';
   SeedPhysicsState.velocity = createVector();
   WorldseedSound.failure();
-  showStatusToast('LOST TO THE VOID', 700);
+  showStatusToast(StatusMessage, 700);
 
   if (RecoveryTimeoutIdentifier !== null) {
     window.clearTimeout(RecoveryTimeoutIdentifier);
@@ -2151,6 +2412,7 @@ function recoverSeedFromVoid() {
     );
     CurrentWorldIdentifier = LastSafeWorldIdentifier;
     LaunchIgnoredWorldIdentifier = null;
+    LaunchIgnoredBodyIdentifier = null;
     GamePhase = 'attached';
     showInstruction('Try another angle', 'Use the gold route rings and wait for a landing lock.');
     RecoveryTimeoutIdentifier = null;
@@ -2161,6 +2423,7 @@ function recoverSeedFromVoid() {
  * Advances live seed physics by one fixed step.
  */
 function simulateSeedFixedStep() {
+  PhysicsElapsedTimeSeconds += FixedPhysicsStepSeconds;
   if (GamePhase !== 'flying') {
     return;
   }
@@ -2182,12 +2445,61 @@ function simulateSeedFixedStep() {
     }
   }
 
+  if (LaunchIgnoredBodyIdentifier) {
+    const StartingBodyDefinition = TacticalBodyDefinitions.find(
+      (BodyDefinition) => BodyDefinition.id === LaunchIgnoredBodyIdentifier,
+    );
+    if (!StartingBodyDefinition) {
+      LaunchIgnoredBodyIdentifier = null;
+    } else {
+      const StartingBodyPosition = calculateBodyPositionAtTime(
+        StartingBodyDefinition,
+        PhysicsElapsedTimeSeconds,
+      );
+      const ClearDistance = StartingBodyDefinition.radius + SeedRadius + 0.35;
+      if (
+        calculateDistanceSquared(SeedPhysicsState.position, StartingBodyPosition)
+        > (ClearDistance * ClearDistance)
+      ) {
+        LaunchIgnoredBodyIdentifier = null;
+      }
+    }
+  }
+
   const CollisionWorldDefinition = findCollidingWorld(
     SeedPhysicsState.position,
     SeedRadius,
     WorldDefinitions,
     LaunchIgnoredWorldIdentifier,
   );
+
+  const CollisionBody = findCollidingBody(
+    SeedPhysicsState.position,
+    SeedRadius,
+    getActiveTacticalBodyDefinitions(),
+    PhysicsElapsedTimeSeconds,
+    LaunchIgnoredBodyIdentifier,
+  );
+
+  if (CollisionBody?.definition.kind === 'hazard') {
+    ImpactPulseMesh.material.color.set(0xff766d);
+    ImpactPulseMesh.position.set(
+      SeedPhysicsState.position.x,
+      SeedPhysicsState.position.y,
+      0.22,
+    );
+    ImpactPulseMesh.scale.setScalar(1);
+    ImpactPulseMesh.visible = true;
+    ImpactPulseLifeSeconds = 0.42;
+    CameraImpactLifeSeconds = 0.24;
+    recoverSeedFromVoid('ASTEROID IMPACT');
+    return;
+  }
+
+  if (CollisionBody?.definition.kind === 'seedstone') {
+    attachSeedToSeedstone(SeedPhysicsState.position);
+    return;
+  }
 
   if (CollisionWorldDefinition) {
     attachSeedToWorld(CollisionWorldDefinition, SeedPhysicsState.position);
@@ -2661,8 +2973,12 @@ function resetGame() {
     StartingSeedPosition.z,
   );
   LaunchIgnoredWorldIdentifier = null;
+  LaunchIgnoredBodyIdentifier = null;
+  SeedstoneUsesRemaining = 1;
+  SeedstoneCrumbleStartedAtSeconds = null;
   GamePhase = 'attached';
   PhysicsAccumulatorSeconds = 0;
+  PhysicsElapsedTimeSeconds = 0;
   GameElapsedTimeSeconds = 0;
 
   TemporaryThreeVector.set(
@@ -2686,7 +3002,11 @@ function resetGame() {
 
   updateWorldCounter();
   updateTargetBeacons(0);
-  const OpeningRouteChoices = getRouteChoices(WorldDefinitions, StartingWorldIdentifier, 2);
+  const OpeningRouteChoices = getRouteChoices(
+    CampaignNodeDefinitions,
+    StartingWorldIdentifier,
+    2,
+  );
   showInstruction(
     'Choose ' + OpeningRouteChoices[0].label + ' or ' + OpeningRouteChoices[1].label,
     'Grab the seed, pull away from a gold-ringed world, then release.',
@@ -2714,6 +3034,7 @@ function renderFrame() {
   updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateCamera(DeltaTimeSeconds);
+  updateTacticalBodies(ElapsedTimeSeconds);
   updateRouteLabels();
   updateFlightAudio();
 

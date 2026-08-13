@@ -5,7 +5,10 @@
 
 /** Returns worlds that count toward system restoration. */
 export function getRestorableWorlds(WorldDefinitions) {
-  return WorldDefinitions.filter((WorldDefinition) => !WorldDefinition.isStartingWorld);
+  return WorldDefinitions.filter((WorldDefinition) => (
+    !WorldDefinition.isStartingWorld
+    && WorldDefinition.countsTowardRestoration !== false
+  ));
 }
 
 /** Counts restored objective worlds without counting the initial launch platform. */

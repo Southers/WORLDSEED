@@ -140,6 +140,70 @@ export function findCollidingWorld(
 }
 
 /**
+ * Resolves the deterministic position of a static or orbiting tactical body.
+ *
+ * Orbiting bodies use authored circular paths in the gameplay plane. Their position is
+ * therefore a pure function of fixed simulation time and can be sampled identically by
+ * trajectory prediction and live flight.
+ *
+ * @param {object} BodyDefinition - Static body or body with an orbit definition.
+ * @param {number} SimulationTimeSeconds - Fixed simulation time to sample.
+ * @returns {{x:number,y:number,z:number}} Body position at the supplied time.
+ */
+export function calculateBodyPositionAtTime(BodyDefinition, SimulationTimeSeconds) {
+  if (!BodyDefinition.orbit) {
+    return createVector(
+      BodyDefinition.position.x,
+      BodyDefinition.position.y,
+      BodyDefinition.position.z,
+    );
+  }
+
+  const OrbitAngle = BodyDefinition.orbit.phaseRadians
+    + (SimulationTimeSeconds * BodyDefinition.orbit.angularSpeedRadiansPerSecond);
+  return createVector(
+    BodyDefinition.orbit.centre.x + (Math.cos(OrbitAngle) * BodyDefinition.orbit.radius),
+    BodyDefinition.orbit.centre.y + (Math.sin(OrbitAngle) * BodyDefinition.orbit.radius),
+    BodyDefinition.orbit.centre.z,
+  );
+}
+
+/**
+ * Finds a collision with a deterministic tactical body at one fixed-step sample.
+ *
+ * @param {{x:number,y:number,z:number}} SeedPosition - Sampled seed position.
+ * @param {number} SeedRadius - Seed collision radius.
+ * @param {Array<object>} BodyDefinitions - Static or orbiting collision bodies.
+ * @param {number} SimulationTimeSeconds - Fixed time associated with the sample.
+ * @param {string|null} IgnoredBodyIdentifier - Optional launch body to ignore.
+ * @returns {{definition:object,position:{x:number,y:number,z:number}}|null} Collision result.
+ */
+export function findCollidingBody(
+  SeedPosition,
+  SeedRadius,
+  BodyDefinitions,
+  SimulationTimeSeconds,
+  IgnoredBodyIdentifier = null,
+) {
+  for (const BodyDefinition of BodyDefinitions) {
+    if (BodyDefinition.id === IgnoredBodyIdentifier || BodyDefinition.active === false) {
+      continue;
+    }
+
+    const BodyPosition = calculateBodyPositionAtTime(BodyDefinition, SimulationTimeSeconds);
+    const CollisionDistance = BodyDefinition.radius + SeedRadius;
+    if (
+      calculateDistanceSquared(SeedPosition, BodyPosition)
+      <= (CollisionDistance * CollisionDistance)
+    ) {
+      return { definition: BodyDefinition, position: BodyPosition };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Predicts a launch trajectory using the same deterministic physics step as live gameplay.
  *
  * @param {{x:number,y:number,z:number}} StartingPosition - Position where launch begins.
@@ -150,7 +214,10 @@ export function findCollidingWorld(
  * @param {number} PredictionSettings.fixedStepSeconds - Physics step duration.
  * @param {number} PredictionSettings.maximumSteps - Maximum points to predict.
  * @param {string|null} PredictionSettings.ignoredWorldIdentifier - Starting world ignored until the trajectory clears it.
- * @returns {{points:Array<{x:number,y:number,z:number}>, collisionWorldIdentifier:string|null}} Predicted points and optional landing world.
+ * @param {Array<object>} [PredictionSettings.collisionBodyDefinitions] - Optional deterministic tactical bodies.
+ * @param {string|null} [PredictionSettings.ignoredCollisionBodyIdentifier] - Optional tactical launch body to ignore.
+ * @param {number} [PredictionSettings.startTimeSeconds] - Fixed simulation time at launch.
+ * @returns {{points:Array<{x:number,y:number,z:number}>, collisionWorldIdentifier:string|null, collisionBodyIdentifier:string|null, collisionKind:string|null, collisionTimeSeconds:number|null}} Predicted points and collision outcome.
  */
 export function predictTrajectory(
   StartingPosition,
@@ -164,7 +231,15 @@ export function predictTrajectory(
     velocity: createVector(StartingVelocity.x, StartingVelocity.y, StartingVelocity.z),
   };
   let CollisionWorldIdentifier = null;
+  let CollisionBodyIdentifier = null;
+  let CollisionKind = null;
+  let CollisionTimeSeconds = null;
   let IgnoredWorldIdentifier = PredictionSettings.ignoredWorldIdentifier;
+  let IgnoredCollisionBodyIdentifier = (
+    PredictionSettings.ignoredCollisionBodyIdentifier ?? null
+  );
+  const CollisionBodyDefinitions = PredictionSettings.collisionBodyDefinitions ?? [];
+  const StartingSimulationTimeSeconds = PredictionSettings.startTimeSeconds ?? 0;
 
   for (let PredictionStepIndex = 0; PredictionStepIndex < PredictionSettings.maximumSteps; PredictionStepIndex += 1) {
     PredictedState = simulatePhysicsStep(
@@ -190,21 +265,65 @@ export function predictTrajectory(
 
     PredictedPoints.push(PredictedState.position);
 
+    const PredictionTimeSeconds = StartingSimulationTimeSeconds
+      + ((PredictionStepIndex + 1) * PredictionSettings.fixedStepSeconds);
     const CollisionWorldDefinition = findCollidingWorld(
       PredictedState.position,
       PredictionSettings.seedRadius,
       WorldDefinitions,
       IgnoredWorldIdentifier,
     );
+    const CollisionBody = findCollidingBody(
+      PredictedState.position,
+      PredictionSettings.seedRadius,
+      CollisionBodyDefinitions,
+      PredictionTimeSeconds,
+      IgnoredCollisionBodyIdentifier,
+    );
+
+    if (CollisionBody) {
+      CollisionBodyIdentifier = CollisionBody.definition.id;
+      CollisionKind = CollisionBody.definition.kind;
+      CollisionTimeSeconds = PredictionTimeSeconds;
+      break;
+    }
 
     if (CollisionWorldDefinition) {
       CollisionWorldIdentifier = CollisionWorldDefinition.id;
+      CollisionKind = 'world';
+      CollisionTimeSeconds = PredictionTimeSeconds;
       break;
+    }
+
+    if (IgnoredCollisionBodyIdentifier) {
+      const IgnoredBodyDefinition = CollisionBodyDefinitions.find(
+        (BodyDefinition) => BodyDefinition.id === IgnoredCollisionBodyIdentifier,
+      );
+      if (!IgnoredBodyDefinition) {
+        IgnoredCollisionBodyIdentifier = null;
+      } else {
+        const IgnoredBodyPosition = calculateBodyPositionAtTime(
+          IgnoredBodyDefinition,
+          PredictionTimeSeconds,
+        );
+        const ClearDistance = IgnoredBodyDefinition.radius
+          + PredictionSettings.seedRadius
+          + 0.35;
+        if (
+          calculateDistanceSquared(PredictedState.position, IgnoredBodyPosition)
+          > (ClearDistance * ClearDistance)
+        ) {
+          IgnoredCollisionBodyIdentifier = null;
+        }
+      }
     }
   }
 
   return {
     points: PredictedPoints,
     collisionWorldIdentifier: CollisionWorldIdentifier,
+    collisionBodyIdentifier: CollisionBodyIdentifier,
+    collisionKind: CollisionKind,
+    collisionTimeSeconds: CollisionTimeSeconds,
   };
 }

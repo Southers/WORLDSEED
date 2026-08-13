@@ -14,11 +14,11 @@
 
 ## One-line pitch
 
-Slingshot a living seed through the gravity wells of three tiny planets and awaken each miniature world where you land.
+Slingshot a living seed across connected tiny planets, use one-shot Seedstones, outthink predictable asteroids and awaken a route to the Worldheart.
 
 ## Short description
 
-WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, choose between tiny destinations and turn every successful landing into the next launch point on the journey to the Worldheart.
+WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, choose between tiny worlds and tactical Seedstones, and time your route around deterministic asteroids on the journey to the Worldheart.
 
 ## Long-form description
 
@@ -26,11 +26,12 @@ WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the se
 
 WORLDSEED is a focused Three.js orbital slingshot game about restoring a miniature planetary system.
 
-Drag the glowing seed backwards and release it into the gravity wells of three authored tiny worlds. The trajectory preview uses the same deterministic fixed-step simulation as live flight, so every curved shot is yours. Land successfully and a luminous restoration wave wraps around the planet from the exact impact point, growing its diorama, atmosphere, motion and music in sequence.
+Drag the glowing seed backwards and release it into the gravity wells of a connected miniature system. The trajectory preview uses the same deterministic fixed-step simulation as live flight—including the future position of moving hazards—so every curved shot is yours. Land successfully and a luminous restoration wave wraps around the planet from the exact impact point, growing its diorama, atmosphere, motion and music in sequence.
 
 - **One expressive input:** drag and release with mouse, pen or touch.
 - **A connected First Light system:** authored Meadow, volcanic Ember and crystalline Frost plus Grove and Tide route prototypes.
 - **A trustworthy gravity toy:** prediction and live flight share one deterministic simulation.
+- **Readable tactical routes:** one-use Seedstones create new launch geometry, while orbiting asteroids turn future collisions red before release.
 - **Immediate recovery:** failed shots return the seed quickly, preserving experimentation.
 - **An authored transformation:** every landing awakens colour, landmarks, ambience and another layer of the procedural score.
 - **Desktop and mobile ready:** responsive framing, touch controls, adaptive pixel density and a mute control.
@@ -45,7 +46,7 @@ No downloaded art or audio assets are used. The dioramas, particles, shaders, mu
 
 ### Theme: Tiny Worlds
 
-The tiny worlds are both the subject and the mechanic. Their curved surfaces create the gravity puzzle, their miniature landmarks make each landing readable, and awakening an entire planet turns a successful shot into a visible world-scale reward. The complete game is deliberately scoped to a polished journey across three desk-toy dioramas.
+The tiny worlds are both the subject and the mechanic. Their curved surfaces create the gravity puzzle, their miniature landmarks make each landing readable, and awakening an entire planet turns a successful shot into a visible world-scale reward. The complete game is deliberately scoped to a polished authored journey across connected desk-toy dioramas.
 
 ### Technology
 
