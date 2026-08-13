@@ -61,6 +61,8 @@ Renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 Renderer.outputColorSpace = THREE.SRGBColorSpace;
 Renderer.toneMapping = THREE.ACESFilmicToneMapping;
 Renderer.toneMappingExposure = 1.15;
+Renderer.shadowMap.enabled = true;
+Renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const Camera = new THREE.PerspectiveCamera(42, 1, 0.1, 180);
 Camera.position.set(0, 0, 42);
@@ -76,6 +78,8 @@ const CameraLookTarget = new THREE.Vector3();
 const DesiredCameraLookTarget = new THREE.Vector3();
 const AimDragVector = new THREE.Vector3();
 const AimLaunchVelocity = new THREE.Vector3();
+const LocalSwayAxis = new THREE.Vector3(0, 0, 1);
+const SurfaceSwayQuaternion = new THREE.Quaternion();
 
 let PhysicsAccumulatorSeconds = 0;
 let GamePhase = 'attached';
@@ -119,7 +123,8 @@ const WorldDefinitions = [
       growthTrailWidth: 0.18,
       waveColor: new THREE.Color(0xe8ffc5),
       atmosphereOpacity: 0.15,
-      rotationSpeed: 0.0011,
+      rotationSpeed: 0.00035,
+      surfaceVariation: 0.1,
     },
   },
   {
@@ -139,6 +144,7 @@ const WorldDefinitions = [
       waveColor: new THREE.Color(0xffdfa1),
       atmosphereOpacity: 0.16,
       rotationSpeed: 0.00125,
+      surfaceVariation: 0.045,
     },
   },
   {
@@ -158,6 +164,7 @@ const WorldDefinitions = [
       waveColor: new THREE.Color(0xe4fbff),
       atmosphereOpacity: 0.18,
       rotationSpeed: 0.001,
+      surfaceVariation: 0.035,
     },
   },
 ];
@@ -177,11 +184,59 @@ function createLighting() {
 
   const KeyLight = new THREE.DirectionalLight(0xfff4dc, 3.2);
   KeyLight.position.set(-12, 18, 24);
+  KeyLight.castShadow = true;
+  KeyLight.shadow.mapSize.set(1024, 1024);
+  KeyLight.shadow.camera.left = -24;
+  KeyLight.shadow.camera.right = 24;
+  KeyLight.shadow.camera.top = 24;
+  KeyLight.shadow.camera.bottom = -24;
+  KeyLight.shadow.camera.near = 4;
+  KeyLight.shadow.camera.far = 80;
+  KeyLight.shadow.bias = -0.0004;
+  KeyLight.shadow.normalBias = 0.035;
   Scene.add(KeyLight);
 
   const FillLight = new THREE.DirectionalLight(0x7aa3d1, 1.0);
   FillLight.position.set(18, -10, 14);
   Scene.add(FillLight);
+
+  const RimLight = new THREE.DirectionalLight(0x83d7ff, 1.15);
+  RimLight.position.set(8, 12, -18);
+  Scene.add(RimLight);
+}
+
+/** Adds a soft generated colour field behind the stars without an external texture. */
+function createBackgroundGlow(Position, Scale, InnerRed, InnerGreen, InnerBlue, InnerAlpha) {
+  const GlowCanvas = document.createElement('canvas');
+  GlowCanvas.width = 128;
+  GlowCanvas.height = 128;
+  const GlowContext = GlowCanvas.getContext('2d');
+  const GlowGradient = GlowContext.createRadialGradient(64, 64, 0, 64, 64, 64);
+  GlowGradient.addColorStop(
+    0,
+    `rgba(${InnerRed}, ${InnerGreen}, ${InnerBlue}, ${InnerAlpha})`,
+  );
+  GlowGradient.addColorStop(
+    0.45,
+    `rgba(${InnerRed}, ${InnerGreen}, ${InnerBlue}, ${InnerAlpha * 0.36})`,
+  );
+  GlowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  GlowContext.fillStyle = GlowGradient;
+  GlowContext.fillRect(0, 0, 128, 128);
+
+  const GlowTexture = new THREE.CanvasTexture(GlowCanvas);
+  GlowTexture.colorSpace = THREE.SRGBColorSpace;
+  const GlowMaterial = new THREE.SpriteMaterial({
+    map: GlowTexture,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const GlowSprite = new THREE.Sprite(GlowMaterial);
+  GlowSprite.position.copy(Position);
+  GlowSprite.scale.set(Scale.x, Scale.y, 1);
+  Scene.add(GlowSprite);
 }
 
 /**
@@ -220,6 +275,23 @@ function createStarField() {
 
   const StarField = new THREE.Points(StarGeometry, StarMaterial);
   Scene.add(StarField);
+
+  createBackgroundGlow(
+    new THREE.Vector3(-15, -9, -24),
+    new THREE.Vector2(35, 27),
+    40,
+    106,
+    92,
+    0.16,
+  );
+  createBackgroundGlow(
+    new THREE.Vector3(14, 10, -26),
+    new THREE.Vector2(31, 25),
+    52,
+    75,
+    130,
+    0.14,
+  );
 }
 
 /**
@@ -270,6 +342,7 @@ function createRestorationSurfaceMaterial(WorldDefinition) {
     deadColor: { value: DeadWorldColor.clone() },
     aliveColor: { value: WorldDefinition.aliveColor.clone() },
     waveColor: { value: WorldDefinition.restoration.waveColor.clone() },
+    surfaceVariation: { value: WorldDefinition.restoration.surfaceVariation },
   };
   const SurfaceMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -299,7 +372,8 @@ function createRestorationSurfaceMaterial(WorldDefinition) {
         uniform float restorationWaveWidth;
         uniform vec3 deadColor;
         uniform vec3 aliveColor;
-        uniform vec3 waveColor;`,
+        uniform vec3 waveColor;
+        uniform float surfaceVariation;`,
       )
       .replace(
         '#include <color_fragment>',
@@ -319,7 +393,11 @@ function createRestorationSurfaceMaterial(WorldDefinition) {
           restorationWaveWidth * 2.2,
           abs(restorationDistance - restorationProgress)
         );
-        diffuseColor.rgb = mix(deadColor, aliveColor, restoredSurface);
+        float surfacePattern = sin(vRestorationNormal.x * 17.0)
+          * sin(vRestorationNormal.y * 23.0)
+          * sin(vRestorationNormal.z * 19.0);
+        vec3 variedAliveColor = aliveColor * (1.0 + (surfacePattern * surfaceVariation));
+        diffuseColor.rgb = mix(deadColor, variedAliveColor, restoredSurface);
         diffuseColor.rgb += waveColor * restorationBand * activeRestorationWave * 0.9;`,
       );
   };
@@ -395,6 +473,366 @@ function createRestorationWaveShell(WorldDefinition, RestorationUniforms) {
   return { mesh: WaveMesh, material: WaveMaterial };
 }
 
+/** Records a prop material's authored colour so the restoration wave can reveal it. */
+function registerRestorableMaterial(PropObject, Material, AliveColor = Material.color) {
+  if (!PropObject.userData.restorationMaterials) {
+    PropObject.userData.restorationMaterials = [];
+  }
+  PropObject.userData.restorationMaterials.push({
+    material: Material,
+    aliveColor: AliveColor.clone(),
+  });
+}
+
+/** Applies dead-to-alive colour to every material owned by a surface prop. */
+function setSurfacePropRestorationProgress(PropObject, RestorationProgress) {
+  const RestorationMaterials = PropObject.userData.restorationMaterials ?? [];
+  for (const RestorationMaterial of RestorationMaterials) {
+    RestorationMaterial.material.color.copy(DarkWorldColor).lerp(
+      RestorationMaterial.aliveColor,
+      RestorationProgress,
+    );
+  }
+}
+
+/** Places a local-Y-up prop against a spherical surface and registers wave metadata. */
+function placeSurfaceProp(
+  PropObject,
+  SurfaceDirection,
+  WorldRadius,
+  BaseScale = 1,
+  SurfaceOffset = 0,
+) {
+  const NormalizedDirection = SurfaceDirection.clone().normalize();
+  PropObject.position.copy(NormalizedDirection).multiplyScalar(WorldRadius + SurfaceOffset);
+  PropObject.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), NormalizedDirection);
+  PropObject.userData.baseQuaternion = PropObject.quaternion.clone();
+  PropObject.scale.setScalar(BaseScale);
+  PropObject.userData.surfaceDirection = NormalizedDirection;
+  PropObject.userData.baseScale = BaseScale;
+  PropObject.userData.restorationDistance = 1;
+  return PropObject;
+}
+
+/** Creates a compact placeholder prop set for worlds awaiting their authored art pass. */
+function createPlaceholderSurfaceProps(WorldDefinition) {
+  const SurfacePropGroup = new THREE.Group();
+  const MarkerGeometry = new THREE.ConeGeometry(0.16, 0.55, 5);
+
+  for (let MarkerIndex = 0; MarkerIndex < 9; MarkerIndex += 1) {
+    const MarkerMaterial = new THREE.MeshStandardMaterial({
+      color: WorldDefinition.restored
+        ? WorldDefinition.aliveColor.clone().offsetHSL(0, 0, 0.16)
+        : DarkWorldColor,
+      roughness: 0.92,
+    });
+    const MarkerMesh = new THREE.Mesh(MarkerGeometry, MarkerMaterial);
+    const MarkerAngle = (MarkerIndex / 9) * Math.PI * 2;
+    const MarkerLatitudeOffset = Math.sin(MarkerIndex * 1.7) * 0.42;
+    const SurfaceDirection = new THREE.Vector3(
+      Math.cos(MarkerAngle) * Math.cos(MarkerLatitudeOffset),
+      Math.sin(MarkerAngle) * Math.cos(MarkerLatitudeOffset),
+      Math.sin(MarkerLatitudeOffset),
+    );
+    const MarkerBaseScale = 0.9 + ((MarkerIndex % 3) * 0.2);
+
+    placeSurfaceProp(MarkerMesh, SurfaceDirection, WorldDefinition.radius + 0.22, MarkerBaseScale);
+    registerRestorableMaterial(
+      MarkerMesh,
+      MarkerMaterial,
+      WorldDefinition.aliveColor.clone().offsetHSL(0, 0, 0.16),
+    );
+    SurfacePropGroup.add(MarkerMesh);
+  }
+
+  return SurfacePropGroup;
+}
+
+/** Creates Meadow's authored low-poly cottage landmark. */
+function createMeadowCottage(WorldDefinition, SurfaceDirection) {
+  const Cottage = new THREE.Group();
+  const WallMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf2dfad,
+    roughness: 0.9,
+  });
+  const RoofMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb65446,
+    roughness: 0.86,
+  });
+  const DoorMaterial = new THREE.MeshStandardMaterial({
+    color: 0x503a31,
+    roughness: 0.94,
+  });
+  const WindowMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffe9a3,
+    emissive: 0xffbd62,
+    emissiveIntensity: 0.75,
+    roughness: 0.4,
+  });
+
+  const Walls = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.56, 0.62), WallMaterial);
+  Walls.position.y = 0.34;
+  Cottage.add(Walls);
+
+  const Roof = new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.48, 4), RoofMaterial);
+  Roof.position.y = 0.84;
+  Roof.rotation.y = Math.PI * 0.25;
+  Cottage.add(Roof);
+
+  const Door = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.34, 0.04), DoorMaterial);
+  Door.position.set(0, 0.23, 0.33);
+  Cottage.add(Door);
+
+  const WindowGeometry = new THREE.BoxGeometry(0.16, 0.15, 0.035);
+  for (const WindowX of [-0.23, 0.23]) {
+    const WindowMesh = new THREE.Mesh(WindowGeometry, WindowMaterial);
+    WindowMesh.position.set(WindowX, 0.42, 0.335);
+    Cottage.add(WindowMesh);
+  }
+
+  placeSurfaceProp(Cottage, SurfaceDirection, WorldDefinition.radius, 1.12, 0.02);
+  registerRestorableMaterial(Cottage, WallMaterial);
+  registerRestorableMaterial(Cottage, RoofMaterial);
+  registerRestorableMaterial(Cottage, DoorMaterial);
+  registerRestorableMaterial(Cottage, WindowMaterial);
+  Cottage.userData.kind = 'cottage';
+  Cottage.userData.windowMaterial = WindowMaterial;
+  return Cottage;
+}
+
+/** Creates one rounded toy-like Meadow tree. */
+function createMeadowTree(WorldDefinition, SurfaceDirection, Scale, Phase) {
+  const Tree = new THREE.Group();
+  const TrunkMaterial = new THREE.MeshStandardMaterial({ color: 0x765139, roughness: 0.96 });
+  const LeafMaterial = new THREE.MeshStandardMaterial({ color: 0x76b85d, roughness: 0.88 });
+  const Trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.11, 0.58, 6), TrunkMaterial);
+  Trunk.position.y = 0.29;
+  Tree.add(Trunk);
+
+  const CanopyGeometry = new THREE.IcosahedronGeometry(0.32, 1);
+  const CanopyPositions = [
+    new THREE.Vector3(0, 0.69, 0),
+    new THREE.Vector3(-0.18, 0.61, 0.04),
+    new THREE.Vector3(0.17, 0.62, -0.03),
+  ];
+  for (const CanopyPosition of CanopyPositions) {
+    const Canopy = new THREE.Mesh(CanopyGeometry, LeafMaterial);
+    Canopy.position.copy(CanopyPosition);
+    Tree.add(Canopy);
+  }
+
+  placeSurfaceProp(Tree, SurfaceDirection, WorldDefinition.radius, Scale, 0.02);
+  registerRestorableMaterial(Tree, TrunkMaterial);
+  registerRestorableMaterial(Tree, LeafMaterial);
+  Tree.userData.kind = 'tree';
+  Tree.userData.swayPhase = Phase;
+  Tree.userData.swayAmount = 0.035;
+  return Tree;
+}
+
+/** Creates a small readable cluster of flowers. */
+function createMeadowFlowers(WorldDefinition, SurfaceDirection, FlowerColor, Phase) {
+  const FlowerCluster = new THREE.Group();
+  const StemMaterial = new THREE.MeshStandardMaterial({ color: 0x528f4c, roughness: 0.95 });
+  const PetalMaterial = new THREE.MeshStandardMaterial({ color: FlowerColor, roughness: 0.8 });
+  const CentreMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffda68,
+    emissive: 0x7a4b12,
+    emissiveIntensity: 0.28,
+    roughness: 0.82,
+  });
+
+  for (let FlowerIndex = 0; FlowerIndex < 3; FlowerIndex += 1) {
+    const FlowerX = (FlowerIndex - 1) * 0.15;
+    const FlowerHeight = 0.25 + ((FlowerIndex % 2) * 0.08);
+    const Stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.025, FlowerHeight, 5),
+      StemMaterial,
+    );
+    Stem.position.set(FlowerX, FlowerHeight * 0.5, (FlowerIndex % 2) * 0.05);
+    FlowerCluster.add(Stem);
+
+    const FlowerHead = new THREE.Mesh(new THREE.IcosahedronGeometry(0.085, 1), PetalMaterial);
+    FlowerHead.position.set(FlowerX, FlowerHeight, (FlowerIndex % 2) * 0.05);
+    FlowerCluster.add(FlowerHead);
+
+    const FlowerCentre = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), CentreMaterial);
+    FlowerCentre.position.set(FlowerX, FlowerHeight + 0.012, 0.075 + ((FlowerIndex % 2) * 0.05));
+    FlowerCluster.add(FlowerCentre);
+  }
+
+  placeSurfaceProp(FlowerCluster, SurfaceDirection, WorldDefinition.radius, 1, 0.025);
+  registerRestorableMaterial(FlowerCluster, StemMaterial);
+  registerRestorableMaterial(FlowerCluster, PetalMaterial);
+  registerRestorableMaterial(FlowerCluster, CentreMaterial);
+  FlowerCluster.userData.kind = 'flowers';
+  FlowerCluster.userData.swayPhase = Phase;
+  FlowerCluster.userData.swayAmount = 0.055;
+  return FlowerCluster;
+}
+
+/** Creates a curved-surface grass tuft from three exaggerated blades. */
+function createMeadowGrass(WorldDefinition, SurfaceDirection, Scale, Phase) {
+  const Grass = new THREE.Group();
+  const GrassMaterial = new THREE.MeshStandardMaterial({ color: 0x9acc68, roughness: 0.96 });
+  const BladeGeometry = new THREE.ConeGeometry(0.045, 0.34, 4);
+
+  for (let BladeIndex = 0; BladeIndex < 3; BladeIndex += 1) {
+    const Blade = new THREE.Mesh(BladeGeometry, GrassMaterial);
+    Blade.position.set((BladeIndex - 1) * 0.08, 0.17, 0);
+    Blade.rotation.z = (BladeIndex - 1) * -0.15;
+    Grass.add(Blade);
+  }
+
+  placeSurfaceProp(Grass, SurfaceDirection, WorldDefinition.radius, Scale, 0.02);
+  registerRestorableMaterial(Grass, GrassMaterial);
+  Grass.userData.kind = 'grass';
+  Grass.userData.swayPhase = Phase;
+  Grass.userData.swayAmount = 0.065;
+  return Grass;
+}
+
+/** Creates Meadow's pond as a glossy tangent disc with a bright rim. */
+function createMeadowPond(WorldDefinition, SurfaceDirection) {
+  const Pond = new THREE.Group();
+  const WaterMaterial = new THREE.MeshStandardMaterial({
+    color: 0x58b7b1,
+    emissive: 0x123e48,
+    emissiveIntensity: 0.45,
+    roughness: 0.24,
+    metalness: 0.05,
+  });
+  const RimMaterial = new THREE.MeshStandardMaterial({ color: 0xbee58d, roughness: 0.9 });
+  const Water = new THREE.Mesh(new THREE.CircleGeometry(0.62, 28), WaterMaterial);
+  Water.rotation.x = -Math.PI * 0.5;
+  Water.scale.z = 0.62;
+  Water.position.y = 0.025;
+  Pond.add(Water);
+
+  const Rim = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.055, 6, 32), RimMaterial);
+  Rim.rotation.x = Math.PI * 0.5;
+  Rim.scale.z = 0.62;
+  Rim.position.y = 0.018;
+  Pond.add(Rim);
+
+  placeSurfaceProp(Pond, SurfaceDirection, WorldDefinition.radius, 1, 0.015);
+  registerRestorableMaterial(Pond, WaterMaterial);
+  registerRestorableMaterial(Pond, RimMaterial);
+  Pond.userData.kind = 'pond';
+  Pond.userData.waterMaterial = WaterMaterial;
+  return Pond;
+}
+
+/** Builds Meadow's final procedural prop composition. */
+function createMeadowSurfaceProps(WorldDefinition) {
+  const SurfacePropGroup = new THREE.Group();
+  const TreeDefinitions = [
+    [-0.64, 0.22, 0.74, 1.1],
+    [0.43, 0.58, 0.69, 0.92],
+    [-0.42, -0.48, 0.77, 0.82],
+    [0.7, -0.14, 0.7, 0.72],
+  ];
+  TreeDefinitions.forEach(([X, Y, Z, Scale], Index) => {
+    SurfacePropGroup.add(createMeadowTree(
+      WorldDefinition,
+      new THREE.Vector3(X, Y, Z),
+      Scale,
+      Index * 1.7,
+    ));
+  });
+
+  SurfacePropGroup.add(createMeadowCottage(
+    WorldDefinition,
+    new THREE.Vector3(-0.16, 0.7, 0.72),
+  ));
+  SurfacePropGroup.add(createMeadowPond(
+    WorldDefinition,
+    new THREE.Vector3(0.2, -0.34, 0.93),
+  ));
+
+  const FlowerDefinitions = [
+    [-0.08, 0.1, 0.99, 0xf0a7c6],
+    [0.48, 0.18, 0.87, 0xd8b0ff],
+    [-0.52, -0.1, 0.85, 0xffd68a],
+    [0.1, 0.55, 0.84, 0xf59cab],
+  ];
+  FlowerDefinitions.forEach(([X, Y, Z, Color], Index) => {
+    SurfacePropGroup.add(createMeadowFlowers(
+      WorldDefinition,
+      new THREE.Vector3(X, Y, Z),
+      Color,
+      0.7 + (Index * 1.2),
+    ));
+  });
+
+  const GrassDirections = [
+    [-0.8, 0.52, 0.3], [0.12, 0.84, 0.52], [0.73, 0.42, 0.54],
+    [-0.76, -0.48, 0.45], [-0.18, -0.76, 0.63], [0.63, -0.58, 0.52],
+    [-0.35, 0.34, 0.88], [0.42, -0.02, 0.91],
+  ];
+  GrassDirections.forEach(([X, Y, Z], Index) => {
+    SurfacePropGroup.add(createMeadowGrass(
+      WorldDefinition,
+      new THREE.Vector3(X, Y, Z),
+      0.78 + ((Index % 3) * 0.1),
+      Index * 0.8,
+    ));
+  });
+
+  const RockGeometry = new THREE.DodecahedronGeometry(0.16, 0);
+  const RockDirections = [
+    [-0.72, 0.68, 0.18], [0.55, 0.72, 0.42], [-0.66, -0.68, 0.3], [0.54, -0.7, 0.46],
+  ];
+  RockDirections.forEach(([X, Y, Z], Index) => {
+    const RockMaterial = new THREE.MeshStandardMaterial({ color: 0xa5ad92, roughness: 1 });
+    const Rock = new THREE.Mesh(RockGeometry, RockMaterial);
+    Rock.scale.set(1.25, 0.8, 1);
+    placeSurfaceProp(
+      Rock,
+      new THREE.Vector3(X, Y, Z),
+      WorldDefinition.radius,
+      0.82 + ((Index % 2) * 0.18),
+      0.04,
+    );
+    registerRestorableMaterial(Rock, RockMaterial);
+    Rock.userData.kind = 'rock';
+    SurfacePropGroup.add(Rock);
+  });
+
+  return SurfacePropGroup;
+}
+
+/** Creates a tiny deterministic halo of warm Meadow motes. */
+function createMeadowMotes(WorldDefinition) {
+  const MoteCount = 24;
+  const MotePositions = new Float32Array(MoteCount * 3);
+
+  for (let MoteIndex = 0; MoteIndex < MoteCount; MoteIndex += 1) {
+    const GoldenAngle = Math.PI * (3 - Math.sqrt(5));
+    const Longitude = MoteIndex * GoldenAngle;
+    const VerticalPosition = 1 - ((MoteIndex + 0.5) / MoteCount) * 2;
+    const HorizontalRadius = Math.sqrt(1 - (VerticalPosition * VerticalPosition));
+    const MoteRadius = WorldDefinition.radius + 0.62 + ((MoteIndex % 4) * 0.08);
+    const PositionOffset = MoteIndex * 3;
+    MotePositions[PositionOffset] = Math.cos(Longitude) * HorizontalRadius * MoteRadius;
+    MotePositions[PositionOffset + 1] = VerticalPosition * MoteRadius;
+    MotePositions[PositionOffset + 2] = Math.sin(Longitude) * HorizontalRadius * MoteRadius;
+  }
+
+  const MoteGeometry = new THREE.BufferGeometry();
+  MoteGeometry.setAttribute('position', new THREE.BufferAttribute(MotePositions, 3));
+  const MoteMaterial = new THREE.PointsMaterial({
+    color: 0xffef9d,
+    size: 0.09,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.72,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  return new THREE.Points(MoteGeometry, MoteMaterial);
+}
+
 /**
  * Creates one world and records its render-time components by identifier.
  *
@@ -412,6 +850,8 @@ function createWorld(WorldDefinition) {
   const SurfaceRestoration = createRestorationSurfaceMaterial(WorldDefinition);
   const SurfaceMaterial = SurfaceRestoration.material;
   const SurfaceMesh = new THREE.Mesh(SurfaceGeometry, SurfaceMaterial);
+  SurfaceMesh.castShadow = true;
+  SurfaceMesh.receiveShadow = true;
   WorldGroup.add(SurfaceMesh);
 
   const RestorationWaveShell = createRestorationWaveShell(
@@ -435,38 +875,29 @@ function createWorld(WorldDefinition) {
   ContourRingGroup.visible = WorldDefinition.restored;
   WorldGroup.add(ContourRingGroup);
 
-  /**
-   * Surface markers are deliberately abstract in the greybox. Their only job is to make
-   * rotation and world scale legible. Day 2 replaces them with biome-specific props.
-   */
-  const SurfaceMarkerGroup = new THREE.Group();
-  const MarkerGeometry = new THREE.ConeGeometry(0.16, 0.55, 5);
+  const SurfaceMarkerGroup = WorldDefinition.id === 'meadow'
+    ? createMeadowSurfaceProps(WorldDefinition)
+    : createPlaceholderSurfaceProps(WorldDefinition);
 
-  for (let MarkerIndex = 0; MarkerIndex < 9; MarkerIndex += 1) {
-    const MarkerMaterial = new THREE.MeshStandardMaterial({
-      color: WorldDefinition.restored ? WorldDefinition.aliveColor.clone().offsetHSL(0, 0, 0.16) : DarkWorldColor,
-      roughness: 0.92,
+  for (const SurfacePropObject of SurfaceMarkerGroup.children) {
+    const CastsUsefulShadow = ['cottage', 'tree', 'rock'].includes(
+      SurfacePropObject.userData.kind,
+    );
+    SurfacePropObject.traverse((SurfaceObject) => {
+      if (SurfaceObject.isMesh) {
+        SurfaceObject.castShadow = CastsUsefulShadow;
+        SurfaceObject.receiveShadow = true;
+      }
     });
-    const MarkerMesh = new THREE.Mesh(MarkerGeometry, MarkerMaterial);
-    const MarkerAngle = (MarkerIndex / 9) * Math.PI * 2;
-    const MarkerLatitudeOffset = Math.sin(MarkerIndex * 1.7) * 0.42;
-    const SurfaceDirection = new THREE.Vector3(
-      Math.cos(MarkerAngle) * Math.cos(MarkerLatitudeOffset),
-      Math.sin(MarkerAngle) * Math.cos(MarkerLatitudeOffset),
-      Math.sin(MarkerLatitudeOffset),
-    ).normalize();
-
-    MarkerMesh.position.copy(SurfaceDirection).multiplyScalar(WorldDefinition.radius + 0.22);
-    MarkerMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), SurfaceDirection);
-    const MarkerBaseScale = 0.9 + ((MarkerIndex % 3) * 0.2);
-    MarkerMesh.scale.setScalar(MarkerBaseScale);
-    MarkerMesh.userData.surfaceDirection = SurfaceDirection.clone();
-    MarkerMesh.userData.baseScale = MarkerBaseScale;
-    MarkerMesh.userData.restorationDistance = WorldDefinition.restored ? 0 : 1;
-    SurfaceMarkerGroup.add(MarkerMesh);
   }
 
   WorldGroup.add(SurfaceMarkerGroup);
+  const AmbientMoteGroup = WorldDefinition.id === 'meadow'
+    ? createMeadowMotes(WorldDefinition)
+    : null;
+  if (AmbientMoteGroup) {
+    WorldGroup.add(AmbientMoteGroup);
+  }
   Scene.add(WorldGroup);
 
   WorldRuntimeByIdentifier.set(WorldDefinition.id, {
@@ -479,7 +910,7 @@ function createWorld(WorldDefinition) {
     atmosphereMesh: AtmosphereMesh,
     contourRingGroup: ContourRingGroup,
     surfaceMarkerGroup: SurfaceMarkerGroup,
-    aliveMarkerColor: WorldDefinition.aliveColor.clone().offsetHSL(0, 0, 0.16),
+    ambientMoteGroup: AmbientMoteGroup,
     restorationOriginLocal: new THREE.Vector3(1, 0, 0),
     restorationStartedAtSeconds: WorldDefinition.restored ? -Infinity : null,
     restorationCompleted: WorldDefinition.restored,
@@ -515,6 +946,7 @@ const SeedCoreMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.05,
 });
 const SeedCoreMesh = new THREE.Mesh(SeedCoreGeometry, SeedCoreMaterial);
+SeedCoreMesh.castShadow = true;
 SeedGroup.add(SeedCoreMesh);
 
 const SeedHaloGeometry = new THREE.SphereGeometry(SeedRadius * 1.65, 24, 16);
@@ -797,13 +1229,13 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
   WorldRuntime.restorationWaveMesh.visible = true;
   WorldRuntime.contourRingGroup.visible = true;
 
-  for (const MarkerMesh of WorldRuntime.surfaceMarkerGroup.children) {
-    MarkerMesh.userData.restorationDistance = calculateNormalizedSphericalDistance(
+  for (const SurfacePropObject of WorldRuntime.surfaceMarkerGroup.children) {
+    SurfacePropObject.userData.restorationDistance = calculateNormalizedSphericalDistance(
       WorldRuntime.restorationOriginLocal,
-      MarkerMesh.userData.surfaceDirection,
+      SurfacePropObject.userData.surfaceDirection,
     );
-    MarkerMesh.scale.setScalar(MarkerMesh.userData.baseScale * 0.05);
-    MarkerMesh.material.color.copy(DarkWorldColor);
+    SurfacePropObject.scale.setScalar(SurfacePropObject.userData.baseScale * 0.05);
+    setSurfacePropRestorationProgress(SurfacePropObject, 0);
   }
 
   updateWorldCounter();
@@ -1257,20 +1689,17 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
       THREE.MathUtils.lerp(0.96, 1, AtmosphereProgress),
     );
 
-    for (const MarkerMesh of WorldRuntime.surfaceMarkerGroup.children) {
+    for (const SurfacePropObject of WorldRuntime.surfaceMarkerGroup.children) {
       const GrowthProgress = IsFullyRestoredAtStart
         ? 1
         : calculateStagedGrowthProgress(
           WaveProgress,
-          MarkerMesh.userData.restorationDistance,
+          SurfacePropObject.userData.restorationDistance,
           WorldDefinition.restoration.growthTrailWidth,
         );
-      const GrowthScale = MarkerMesh.userData.baseScale * Math.max(0.05, GrowthProgress);
-      MarkerMesh.scale.setScalar(GrowthScale);
-      MarkerMesh.material.color.copy(DarkWorldColor).lerp(
-        WorldRuntime.aliveMarkerColor,
-        GrowthProgress,
-      );
+      const GrowthScale = SurfacePropObject.userData.baseScale * Math.max(0.05, GrowthProgress);
+      SurfacePropObject.scale.setScalar(GrowthScale);
+      setSurfacePropRestorationProgress(SurfacePropObject, GrowthProgress);
     }
 
     if (LinearRestorationProgress < 1) {
@@ -1310,6 +1739,40 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
     WorldRuntime.contourRingGroup.scale.setScalar(
       THREE.MathUtils.lerp(0.88, 1, AtmosphereProgress),
     );
+  }
+}
+
+/** Adds gentle life to Meadow without distracting from aiming or the restoration wave. */
+function updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds) {
+  const MeadowRuntime = WorldRuntimeByIdentifier.get('meadow');
+
+  for (const SurfacePropObject of MeadowRuntime.surfaceMarkerGroup.children) {
+    if (SurfacePropObject.userData.swayAmount) {
+      const SwayAngle = Math.sin(
+        (ElapsedTimeSeconds * 1.55) + SurfacePropObject.userData.swayPhase,
+      ) * SurfacePropObject.userData.swayAmount;
+      SurfaceSwayQuaternion.setFromAxisAngle(LocalSwayAxis, SwayAngle);
+      SurfacePropObject.quaternion.copy(SurfacePropObject.userData.baseQuaternion).multiply(
+        SurfaceSwayQuaternion,
+      );
+    }
+
+    if (SurfacePropObject.userData.kind === 'pond') {
+      SurfacePropObject.userData.waterMaterial.emissiveIntensity = 0.4
+        + (Math.sin(ElapsedTimeSeconds * 1.8) * 0.08);
+    }
+
+    if (SurfacePropObject.userData.kind === 'cottage') {
+      SurfacePropObject.userData.windowMaterial.emissiveIntensity = 0.7
+        + (Math.sin((ElapsedTimeSeconds * 2.1) + 0.6) * 0.08);
+    }
+  }
+
+  if (MeadowRuntime.ambientMoteGroup) {
+    MeadowRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.09;
+    MeadowRuntime.ambientMoteGroup.rotation.z += DeltaTimeSeconds * 0.025;
+    MeadowRuntime.ambientMoteGroup.material.opacity = 0.62
+      + (Math.sin(ElapsedTimeSeconds * 2.4) * 0.12);
   }
 }
 
@@ -1495,15 +1958,12 @@ function resetGame() {
     WorldRuntime.group.rotation.set(0, 0, 0);
     WorldRuntime.group.scale.setScalar(1);
 
-    for (const MarkerMesh of WorldRuntime.surfaceMarkerGroup.children) {
-      MarkerMesh.material.color.copy(
-        WorldDefinition.isStartingWorld
-          ? WorldRuntime.aliveMarkerColor
-          : DarkWorldColor,
-      );
-      MarkerMesh.userData.restorationDistance = WorldDefinition.isStartingWorld ? 0 : 1;
-      MarkerMesh.scale.setScalar(
-        MarkerMesh.userData.baseScale * (WorldDefinition.isStartingWorld ? 1 : 0.05),
+    for (const SurfacePropObject of WorldRuntime.surfaceMarkerGroup.children) {
+      const RestorationProgress = WorldDefinition.isStartingWorld ? 1 : 0;
+      setSurfacePropRestorationProgress(SurfacePropObject, RestorationProgress);
+      SurfacePropObject.userData.restorationDistance = WorldDefinition.isStartingWorld ? 0 : 1;
+      SurfacePropObject.scale.setScalar(
+        SurfacePropObject.userData.baseScale * (WorldDefinition.isStartingWorld ? 1 : 0.05),
       );
     }
   }
@@ -1579,6 +2039,7 @@ function renderFrame() {
   }
 
   updateWorldRestorationVisuals(ElapsedTimeSeconds);
+  updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateCamera(DeltaTimeSeconds);
 

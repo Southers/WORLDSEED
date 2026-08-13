@@ -22,7 +22,7 @@ Use a clean browser at a desktop viewport and again at a portrait mobile viewpor
 
 ## Current checkpoint
 
-`main` begins with a preserved Day 1 gameplay proof:
+The current build includes:
 
 - deterministic spherical gravity;
 - drag-to-launch pointer controls;
@@ -30,12 +30,23 @@ Use a clean browser at a desktop viewport and again at a portrait mobile viewpor
 - world collisions and landing;
 - configurable planet-wrapping restoration waves driven by spherical distance from impact;
 - staged surface growth, atmosphere bloom and world motion behind each restoration wave;
+- an authored Meadow diorama with a cottage, pond, trees, flowers, grass, stones and ambient motes;
+- miniature lighting, soft shadows and restrained biome motion;
 - out-of-bounds recovery;
 - victory and reset loops;
 - mobile-friendly pointer input;
 - framework-free physics tests.
 
-The art is intentionally placeholder geometry at this checkpoint. The public baseline, first-shot game feel and reusable restoration transformation are established; Meadow is the next submission-quality vertical slice.
+Meadow establishes the authored visual grammar and mobile-scale silhouette bar. Ember and Frost still use placeholder props and are the next worlds to receive distinct art, motion and restoration choreography.
+
+### Visual budget
+
+- Keep the complete scene below roughly 180 draw calls during a restoration wave.
+- Retain the device-pixel-ratio cap of 2 and the single 1024px key-light shadow map.
+- Cast dynamic shadows only from planets, the seed and large silhouette props.
+- Keep biome ambience pooled or fixed-size: Meadow uses 24 motes and flight uses 22 trail particles.
+- Avoid per-frame geometry, material, vector or particle allocation in render loops.
+- Treat stable 60 fps desktop and 30 fps mobile as the minimum final-profile targets.
 
 ## Run locally
 
