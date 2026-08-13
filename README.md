@@ -55,7 +55,7 @@ All three worlds now meet the authored diorama and mobile-scale silhouette bar. 
 
 ## Run locally
 
-Because the jam build uses a pinned Three.js ESM URL, no package installation is required. Serve the repository rather than opening `index.html` directly.
+The pinned Three.js ESM runtime modules are vendored, so no package installation or third-party CDN is required. Serve the repository rather than opening `index.html` directly.
 
 ```bash
 python -m http.server 8080
