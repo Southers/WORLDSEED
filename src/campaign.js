@@ -67,3 +67,42 @@ export function getRouteChoices(
     .slice(0, MaximumChoiceCount)
     .map((Choice) => Choice.definition);
 }
+
+/**
+ * Returns optional pickups intersected by a deterministic predicted path.
+ *
+ * Each pickup is reported at most once even when several fixed-step samples cross it.
+ */
+export function getTrajectoryPickupIdentifiers(
+  TrajectoryPoints,
+  PickupDefinitions,
+  CollectorRadius,
+) {
+  const RemainingPickupDefinitions = PickupDefinitions.filter(
+    (PickupDefinition) => !PickupDefinition.collected,
+  );
+  const CollectedPickupIdentifiers = [];
+  const CollectionDistanceSquared = CollectorRadius * CollectorRadius;
+
+  for (const TrajectoryPoint of TrajectoryPoints) {
+    for (
+      let PickupIndex = RemainingPickupDefinitions.length - 1;
+      PickupIndex >= 0;
+      PickupIndex -= 1
+    ) {
+      const PickupDefinition = RemainingPickupDefinitions[PickupIndex];
+      const DifferenceX = PickupDefinition.position.x - TrajectoryPoint.x;
+      const DifferenceY = PickupDefinition.position.y - TrajectoryPoint.y;
+      const DifferenceZ = PickupDefinition.position.z - TrajectoryPoint.z;
+      if (
+        ((DifferenceX * DifferenceX) + (DifferenceY * DifferenceY) + (DifferenceZ * DifferenceZ))
+        <= CollectionDistanceSquared
+      ) {
+        CollectedPickupIdentifiers.push(PickupDefinition.id);
+        RemainingPickupDefinitions.splice(PickupIndex, 1);
+      }
+    }
+  }
+
+  return CollectedPickupIdentifiers;
+}

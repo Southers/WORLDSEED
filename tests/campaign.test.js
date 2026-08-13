@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   countRestoredWorlds,
   getRouteChoices,
+  getTrajectoryPickupIdentifiers,
   isSystemRestored,
 } from '../src/campaign.js';
 
@@ -92,4 +93,23 @@ test('system completion counts only objective worlds', () => {
   }
   assert.equal(countRestoredWorlds(WorldDefinitions), 4);
   assert.equal(isSystemRestored(WorldDefinitions), true);
+});
+
+test('trajectory pickup prediction reports each uncollected mote once', () => {
+  const PickupDefinitions = [
+    { id: 'arc-1', position: { x: 1, y: 0, z: 0 }, collected: false },
+    { id: 'arc-2', position: { x: 2, y: 0, z: 0 }, collected: true },
+    { id: 'arc-3', position: { x: 3, y: 0, z: 0 }, collected: false },
+  ];
+  const TrajectoryPoints = [
+    { x: 0, y: 0, z: 0 },
+    { x: 0.9, y: 0, z: 0 },
+    { x: 1.1, y: 0, z: 0 },
+    { x: 3.05, y: 0, z: 0 },
+  ];
+
+  assert.deepEqual(
+    getTrajectoryPickupIdentifiers(TrajectoryPoints, PickupDefinitions, 0.2).sort(),
+    ['arc-1', 'arc-3'],
+  );
 });

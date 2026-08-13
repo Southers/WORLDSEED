@@ -291,6 +291,28 @@ export class WorldseedAudio {
     });
   }
 
+  stardust(CollectedCount, TotalCount) {
+    const IsArcComplete = CollectedCount === TotalCount;
+    const RootFrequency = 660 * Math.pow(2, (CollectedCount - 1) / 12);
+    this.playTone({
+      frequency: RootFrequency,
+      endFrequency: RootFrequency * 1.35,
+      duration: IsArcComplete ? 0.38 : 0.2,
+      volume: 0.052,
+      type: 'sine',
+    });
+    if (IsArcComplete) {
+      this.playTone({
+        frequency: RootFrequency * 1.5,
+        endFrequency: RootFrequency * 2,
+        duration: 0.48,
+        volume: 0.045,
+        type: 'triangle',
+        delay: 0.08,
+      });
+    }
+  }
+
   failure() {
     this.endAim();
     this.endFlight();

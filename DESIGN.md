@@ -38,7 +38,7 @@ Restoration order matters because every awakened world becomes a persistent laun
 
 The campaign is a sequence of authored planetary systems rather than one unbounded procedural universe.
 
-- **Prologue — First Light:** authored Meadow → Ember → Frost establishes the visual bar while Grove, Tide, a one-use Seedstone and the orbiting Wayfarer currently prove branching routes, persistent launch nodes and deterministic timing windows.
+- **Prologue — First Light:** authored Meadow → Ember → Frost establishes the visual bar while Grove, Tide, a one-use Seedstone, the orbiting Wayfarer and a three-mote Arc prove branching routes, persistent launch nodes, deterministic timing windows and optional mastery.
 - **System I — The Broken Belt:** introduces branching destinations, Seedstones and a predictable orbiting asteroid.
 - **System II — The Wandering Garden:** develops moving launch windows, moons and optional route challenges.
 - **System III — The Long Night:** combines longer gravity assists, tighter safe routes and stronger narrative stakes.
@@ -82,6 +82,8 @@ Asteroids should create readable choices rather than random punishment.
 - Optional pickups placed on expressive or risky curves.
 - Never required for basic completion.
 - Contribute to system mastery rather than an economy.
+- Glow gold when the current shared-physics prediction will collect them, and state the promised pickup count before release.
+- Remain collected through the current run, while Reset restores the complete challenge.
 
 ## Objectives and mastery
 

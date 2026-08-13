@@ -34,7 +34,7 @@ Checkpoint: implemented in First Light with Grove/Ember opening choices, Tide/Fr
 
 Exit: asteroids introduce planning and timing without surprise failure or visual clutter.
 
-Checkpoint: the first tactical slice is implemented in First Light with a blue one-use Seedstone, the visible deterministic Wayfarer orbit, future-step red collision prediction, fast impact recovery and an authored wait-to-open route. Desktop and portrait-mobile complete the full journey within the 180-call budget. The optional stardust route remains before Milestone 2 is complete.
+Checkpoint: complete in First Light with a blue one-use Seedstone, the visible deterministic Wayfarer orbit, future-step red collision prediction, fast impact recovery and an authored three-mote Arc from Meadow to Frost. Prediction highlights every promised mote and reports `ARC +N`; live flight collects through the same fixed steps. Desktop and portrait-mobile prove the Arc's timing choice—an immediate attempt can meet Wayfarer, while waiting opens a safe 3 / 3 route—and remain within the 180-call budget.
 
 ## Milestone 3 — System objective and meta loop
 
