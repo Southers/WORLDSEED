@@ -481,6 +481,8 @@ function registerRestorableMaterial(PropObject, Material, AliveColor = Material.
   PropObject.userData.restorationMaterials.push({
     material: Material,
     aliveColor: AliveColor.clone(),
+    aliveEmissive: Material.emissive ? Material.emissive.clone() : null,
+    aliveEmissiveIntensity: Material.emissiveIntensity ?? 0,
   });
 }
 
@@ -492,6 +494,15 @@ function setSurfacePropRestorationProgress(PropObject, RestorationProgress) {
       RestorationMaterial.aliveColor,
       RestorationProgress,
     );
+    if (RestorationMaterial.aliveEmissive && RestorationMaterial.material.emissive) {
+      RestorationMaterial.material.emissive.set(0x000000).lerp(
+        RestorationMaterial.aliveEmissive,
+        RestorationProgress,
+      );
+      RestorationMaterial.material.emissiveIntensity = (
+        RestorationMaterial.aliveEmissiveIntensity * RestorationProgress
+      );
+    }
   }
 }
 
@@ -802,6 +813,312 @@ function createMeadowSurfaceProps(WorldDefinition) {
   return SurfacePropGroup;
 }
 
+/** Creates a cluster of rising basalt columns with a restrained inner heat glow. */
+function createEmberBasaltCluster(WorldDefinition, SurfaceDirection, Scale, Phase) {
+  const BasaltCluster = new THREE.Group();
+  const BasaltMaterial = new THREE.MeshStandardMaterial({
+    color: 0x41353a,
+    roughness: 0.82,
+    metalness: 0.08,
+  });
+  const HeatMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff8a42,
+    emissive: 0xff461f,
+    emissiveIntensity: 1.35,
+    roughness: 0.45,
+  });
+  const ColumnHeights = [0.56, 0.82, 0.43, 0.67, 0.36];
+  const ColumnPositions = [
+    [-0.18, 0], [0, 0.03], [0.18, 0.02], [-0.08, 0.18], [0.13, 0.17],
+  ];
+
+  ColumnHeights.forEach((ColumnHeight, Index) => {
+    const Column = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.13, ColumnHeight, 6),
+      BasaltMaterial,
+    );
+    Column.position.set(
+      ColumnPositions[Index][0],
+      ColumnHeight * 0.5,
+      ColumnPositions[Index][1],
+    );
+    Column.rotation.y = (Index % 2) * 0.22;
+    BasaltCluster.add(Column);
+
+    if (Index < 2) {
+      const HeatCap = new THREE.Mesh(new THREE.CircleGeometry(0.075, 6), HeatMaterial);
+      HeatCap.rotation.x = -Math.PI * 0.5;
+      HeatCap.position.set(
+        ColumnPositions[Index][0],
+        ColumnHeight + 0.003,
+        ColumnPositions[Index][1],
+      );
+      BasaltCluster.add(HeatCap);
+    }
+  });
+
+  placeSurfaceProp(BasaltCluster, SurfaceDirection, WorldDefinition.radius, Scale, 0.025);
+  registerRestorableMaterial(BasaltCluster, BasaltMaterial);
+  registerRestorableMaterial(BasaltCluster, HeatMaterial);
+  BasaltCluster.userData.kind = 'basalt';
+  BasaltCluster.userData.heatMaterial = HeatMaterial;
+  BasaltCluster.userData.motionPhase = Phase;
+  return BasaltCluster;
+}
+
+/** Creates Ember's volcanic landmark with a glowing caldera. */
+function createEmberCaldera(WorldDefinition, SurfaceDirection) {
+  const Caldera = new THREE.Group();
+  const CrustMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4a3432,
+    roughness: 0.96,
+  });
+  const LavaMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffa33e,
+    emissive: 0xff3c12,
+    emissiveIntensity: 2.2,
+    roughness: 0.28,
+  });
+  const Volcano = new THREE.Mesh(new THREE.ConeGeometry(0.66, 0.85, 7, 1, true), CrustMaterial);
+  Volcano.position.y = 0.42;
+  Caldera.add(Volcano);
+
+  const LavaMouth = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), LavaMaterial);
+  LavaMouth.rotation.x = -Math.PI * 0.5;
+  LavaMouth.position.y = 0.84;
+  Caldera.add(LavaMouth);
+
+  const CraterRim = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.085, 6, 22), CrustMaterial);
+  CraterRim.rotation.x = Math.PI * 0.5;
+  CraterRim.position.y = 0.845;
+  Caldera.add(CraterRim);
+
+  placeSurfaceProp(Caldera, SurfaceDirection, WorldDefinition.radius, 1.08, 0.015);
+  registerRestorableMaterial(Caldera, CrustMaterial);
+  registerRestorableMaterial(Caldera, LavaMaterial);
+  Caldera.userData.kind = 'volcano';
+  Caldera.userData.lavaMaterial = LavaMaterial;
+  return Caldera;
+}
+
+/** Creates a small molten pool set into Ember's curved crust. */
+function createEmberLavaPool(WorldDefinition, SurfaceDirection) {
+  const LavaPool = new THREE.Group();
+  const LavaMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff9a38,
+    emissive: 0xff3514,
+    emissiveIntensity: 1.8,
+    roughness: 0.25,
+  });
+  const RimMaterial = new THREE.MeshStandardMaterial({ color: 0x4e3735, roughness: 0.98 });
+  const Lava = new THREE.Mesh(new THREE.CircleGeometry(0.5, 24), LavaMaterial);
+  Lava.rotation.x = -Math.PI * 0.5;
+  Lava.scale.z = 0.55;
+  Lava.position.y = 0.026;
+  LavaPool.add(Lava);
+  const Rim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 6, 28), RimMaterial);
+  Rim.rotation.x = Math.PI * 0.5;
+  Rim.scale.z = 0.55;
+  Rim.position.y = 0.02;
+  LavaPool.add(Rim);
+
+  placeSurfaceProp(LavaPool, SurfaceDirection, WorldDefinition.radius, 1, 0.015);
+  registerRestorableMaterial(LavaPool, LavaMaterial);
+  registerRestorableMaterial(LavaPool, RimMaterial);
+  LavaPool.userData.kind = 'lavaPool';
+  LavaPool.userData.lavaMaterial = LavaMaterial;
+  return LavaPool;
+}
+
+/** Builds Ember's authored volcanic prop composition. */
+function createEmberSurfaceProps(WorldDefinition) {
+  const SurfacePropGroup = new THREE.Group();
+  SurfacePropGroup.add(createEmberCaldera(
+    WorldDefinition,
+    new THREE.Vector3(0.24, 0.58, 0.79),
+  ));
+  SurfacePropGroup.add(createEmberLavaPool(
+    WorldDefinition,
+    new THREE.Vector3(-0.08, -0.42, 0.91),
+  ));
+
+  const ClusterDefinitions = [
+    [-0.64, 0.34, 0.7, 1.0], [0.62, 0.12, 0.78, 0.86],
+    [-0.54, -0.48, 0.69, 0.72], [0.58, -0.55, 0.6, 0.68],
+  ];
+  ClusterDefinitions.forEach(([X, Y, Z, Scale], Index) => {
+    SurfacePropGroup.add(createEmberBasaltCluster(
+      WorldDefinition,
+      new THREE.Vector3(X, Y, Z),
+      Scale,
+      Index * 1.4,
+    ));
+  });
+
+  const ShardGeometry = new THREE.TetrahedronGeometry(0.19, 0);
+  const ShardDirections = [
+    [-0.78, 0.58, 0.26], [0.72, 0.58, 0.38], [-0.72, -0.65, 0.25],
+    [0.72, -0.62, 0.31], [0.05, 0.02, 1],
+  ];
+  ShardDirections.forEach(([X, Y, Z], Index) => {
+    const ShardMaterial = new THREE.MeshStandardMaterial({
+      color: Index % 2 === 0 ? 0x513a3a : 0x372f35,
+      roughness: 0.88,
+      metalness: 0.06,
+    });
+    const Shard = new THREE.Mesh(ShardGeometry, ShardMaterial);
+    Shard.rotation.y = Index * 0.7;
+    placeSurfaceProp(
+      Shard,
+      new THREE.Vector3(X, Y, Z),
+      WorldDefinition.radius,
+      0.8 + ((Index % 3) * 0.18),
+      0.055,
+    );
+    registerRestorableMaterial(Shard, ShardMaterial);
+    Shard.userData.kind = 'rock';
+    SurfacePropGroup.add(Shard);
+  });
+
+  return SurfacePropGroup;
+}
+
+/** Creates one translucent-looking cluster of faceted Frost crystals. */
+function createFrostCrystalCluster(WorldDefinition, SurfaceDirection, Scale, Phase) {
+  const CrystalCluster = new THREE.Group();
+  const CrystalMaterial = new THREE.MeshStandardMaterial({
+    color: 0xbdebf2,
+    emissive: 0x4b9db4,
+    emissiveIntensity: 0.72,
+    roughness: 0.2,
+    metalness: 0.08,
+  });
+  const CrystalGeometry = new THREE.OctahedronGeometry(0.28, 0);
+  const CrystalDefinitions = [
+    [-0.2, 0.5, 0, 1.45], [0.02, 0.7, 0.02, 1.9], [0.23, 0.42, -0.02, 1.15],
+  ];
+  CrystalDefinitions.forEach(([X, Y, Z, HeightScale], Index) => {
+    const Crystal = new THREE.Mesh(CrystalGeometry, CrystalMaterial);
+    Crystal.position.set(X, Y * 0.52, Z);
+    Crystal.scale.set(0.72, HeightScale, 0.72);
+    Crystal.rotation.y = Index * 0.42;
+    CrystalCluster.add(Crystal);
+  });
+
+  placeSurfaceProp(CrystalCluster, SurfaceDirection, WorldDefinition.radius, Scale, 0.025);
+  registerRestorableMaterial(CrystalCluster, CrystalMaterial);
+  CrystalCluster.userData.kind = 'crystal';
+  CrystalCluster.userData.crystalMaterial = CrystalMaterial;
+  CrystalCluster.userData.motionPhase = Phase;
+  return CrystalCluster;
+}
+
+/** Creates Frost's large ice arch landmark. */
+function createFrostIceArch(WorldDefinition, SurfaceDirection) {
+  const IceArch = new THREE.Group();
+  const IceMaterial = new THREE.MeshStandardMaterial({
+    color: 0xd9f6f8,
+    emissive: 0x5cabc1,
+    emissiveIntensity: 0.62,
+    roughness: 0.22,
+    metalness: 0.06,
+  });
+  for (const PillarX of [-0.4, 0.4]) {
+    const Pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.66, 6), IceMaterial);
+    Pillar.position.set(PillarX, 0.33, 0);
+    IceArch.add(Pillar);
+  }
+  const Arch = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.11, 6, 24, Math.PI), IceMaterial);
+  Arch.position.y = 0.64;
+  IceArch.add(Arch);
+
+  placeSurfaceProp(IceArch, SurfaceDirection, WorldDefinition.radius, 1.15, 0.02);
+  registerRestorableMaterial(IceArch, IceMaterial);
+  IceArch.userData.kind = 'iceArch';
+  IceArch.userData.crystalMaterial = IceMaterial;
+  return IceArch;
+}
+
+/** Creates a luminous frozen lake on Frost. */
+function createFrostLake(WorldDefinition, SurfaceDirection) {
+  const FrozenLake = new THREE.Group();
+  const IceMaterial = new THREE.MeshStandardMaterial({
+    color: 0x99dce8,
+    emissive: 0x326f91,
+    emissiveIntensity: 0.48,
+    roughness: 0.16,
+    metalness: 0.12,
+  });
+  const SnowMaterial = new THREE.MeshStandardMaterial({ color: 0xe8f5f2, roughness: 0.88 });
+  const Ice = new THREE.Mesh(new THREE.CircleGeometry(0.58, 28), IceMaterial);
+  Ice.rotation.x = -Math.PI * 0.5;
+  Ice.scale.z = 0.62;
+  Ice.position.y = 0.025;
+  FrozenLake.add(Ice);
+  const SnowRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.055, 6, 30), SnowMaterial);
+  SnowRim.rotation.x = Math.PI * 0.5;
+  SnowRim.scale.z = 0.62;
+  SnowRim.position.y = 0.02;
+  FrozenLake.add(SnowRim);
+
+  placeSurfaceProp(FrozenLake, SurfaceDirection, WorldDefinition.radius, 1, 0.015);
+  registerRestorableMaterial(FrozenLake, IceMaterial);
+  registerRestorableMaterial(FrozenLake, SnowMaterial);
+  FrozenLake.userData.kind = 'frozenLake';
+  FrozenLake.userData.crystalMaterial = IceMaterial;
+  return FrozenLake;
+}
+
+/** Builds Frost's authored crystalline prop composition. */
+function createFrostSurfaceProps(WorldDefinition) {
+  const SurfacePropGroup = new THREE.Group();
+  SurfacePropGroup.add(createFrostIceArch(
+    WorldDefinition,
+    new THREE.Vector3(-0.18, 0.68, 0.73),
+  ));
+  SurfacePropGroup.add(createFrostLake(
+    WorldDefinition,
+    new THREE.Vector3(0.22, -0.36, 0.91),
+  ));
+
+  const CrystalDefinitions = [
+    [-0.64, 0.25, 0.73, 1.0], [0.55, 0.43, 0.71, 0.9],
+    [-0.5, -0.53, 0.69, 0.78], [0.64, -0.45, 0.63, 0.72],
+    [0.2, 0.15, 0.97, 0.64],
+  ];
+  CrystalDefinitions.forEach(([X, Y, Z, Scale], Index) => {
+    SurfacePropGroup.add(createFrostCrystalCluster(
+      WorldDefinition,
+      new THREE.Vector3(X, Y, Z),
+      Scale,
+      Index * 1.15,
+    ));
+  });
+
+  const SnowGeometry = new THREE.IcosahedronGeometry(0.24, 1);
+  const SnowDirections = [
+    [-0.75, 0.6, 0.27], [0.7, 0.63, 0.34], [-0.72, -0.65, 0.27],
+    [0.72, -0.62, 0.31], [-0.12, 0.04, 0.99],
+  ];
+  SnowDirections.forEach(([X, Y, Z], Index) => {
+    const SnowMaterial = new THREE.MeshStandardMaterial({ color: 0xe5f1ee, roughness: 0.94 });
+    const SnowMound = new THREE.Mesh(SnowGeometry, SnowMaterial);
+    SnowMound.scale.set(1.2, 0.55, 1);
+    placeSurfaceProp(
+      SnowMound,
+      new THREE.Vector3(X, Y, Z),
+      WorldDefinition.radius,
+      0.78 + ((Index % 2) * 0.18),
+      0.035,
+    );
+    registerRestorableMaterial(SnowMound, SnowMaterial);
+    SnowMound.userData.kind = 'snow';
+    SurfacePropGroup.add(SnowMound);
+  });
+
+  return SurfacePropGroup;
+}
+
 /** Creates a tiny deterministic halo of warm Meadow motes. */
 function createMeadowMotes(WorldDefinition) {
   const MoteCount = 24;
@@ -831,6 +1148,39 @@ function createMeadowMotes(WorldDefinition) {
     blending: THREE.AdditiveBlending,
   });
   return new THREE.Points(MoteGeometry, MoteMaterial);
+}
+
+/** Creates a fixed-size deterministic particle halo for a restored biome. */
+function createBiomeMotes(WorldDefinition, MoteCount, Color, Size, BaseOpacity) {
+  const MotePositions = new Float32Array(MoteCount * 3);
+
+  for (let MoteIndex = 0; MoteIndex < MoteCount; MoteIndex += 1) {
+    const GoldenAngle = Math.PI * (3 - Math.sqrt(5));
+    const Longitude = MoteIndex * GoldenAngle;
+    const VerticalPosition = 1 - ((MoteIndex + 0.5) / MoteCount) * 2;
+    const HorizontalRadius = Math.sqrt(1 - (VerticalPosition * VerticalPosition));
+    const RadiusVariation = ((MoteIndex * 7) % 5) * 0.09;
+    const MoteRadius = WorldDefinition.radius + 0.48 + RadiusVariation;
+    const PositionOffset = MoteIndex * 3;
+    MotePositions[PositionOffset] = Math.cos(Longitude) * HorizontalRadius * MoteRadius;
+    MotePositions[PositionOffset + 1] = VerticalPosition * MoteRadius;
+    MotePositions[PositionOffset + 2] = Math.sin(Longitude) * HorizontalRadius * MoteRadius;
+  }
+
+  const MoteGeometry = new THREE.BufferGeometry();
+  MoteGeometry.setAttribute('position', new THREE.BufferAttribute(MotePositions, 3));
+  const MoteMaterial = new THREE.PointsMaterial({
+    color: Color,
+    size: Size,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: WorldDefinition.restored ? BaseOpacity : 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const MoteGroup = new THREE.Points(MoteGeometry, MoteMaterial);
+  MoteGroup.userData.baseOpacity = BaseOpacity;
+  return MoteGroup;
 }
 
 /**
@@ -875,12 +1225,19 @@ function createWorld(WorldDefinition) {
   ContourRingGroup.visible = WorldDefinition.restored;
   WorldGroup.add(ContourRingGroup);
 
-  const SurfaceMarkerGroup = WorldDefinition.id === 'meadow'
-    ? createMeadowSurfaceProps(WorldDefinition)
-    : createPlaceholderSurfaceProps(WorldDefinition);
+  const SurfacePropFactories = {
+    meadow: createMeadowSurfaceProps,
+    ember: createEmberSurfaceProps,
+    frost: createFrostSurfaceProps,
+  };
+  const SurfaceMarkerGroup = (
+    SurfacePropFactories[WorldDefinition.id] ?? createPlaceholderSurfaceProps
+  )(WorldDefinition);
 
   for (const SurfacePropObject of SurfaceMarkerGroup.children) {
-    const CastsUsefulShadow = ['cottage', 'tree', 'rock'].includes(
+    const CastsUsefulShadow = [
+      'cottage', 'tree', 'rock', 'basalt', 'volcano', 'crystal', 'iceArch',
+    ].includes(
       SurfacePropObject.userData.kind,
     );
     SurfacePropObject.traverse((SurfaceObject) => {
@@ -894,7 +1251,14 @@ function createWorld(WorldDefinition) {
   WorldGroup.add(SurfaceMarkerGroup);
   const AmbientMoteGroup = WorldDefinition.id === 'meadow'
     ? createMeadowMotes(WorldDefinition)
-    : null;
+    : createBiomeMotes(
+      WorldDefinition,
+      WorldDefinition.id === 'ember' ? 30 : 34,
+      WorldDefinition.id === 'ember' ? 0xff7b32 : 0xcdf8ff,
+      WorldDefinition.id === 'ember' ? 0.105 : 0.085,
+      WorldDefinition.id === 'ember' ? 0.78 : 0.64,
+    );
+  AmbientMoteGroup.userData.baseOpacity ??= 0.72;
   if (AmbientMoteGroup) {
     WorldGroup.add(AmbientMoteGroup);
   }
@@ -1739,12 +2103,19 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
     WorldRuntime.contourRingGroup.scale.setScalar(
       THREE.MathUtils.lerp(0.88, 1, AtmosphereProgress),
     );
+    if (WorldRuntime.ambientMoteGroup) {
+      WorldRuntime.ambientMoteGroup.material.opacity = (
+        WorldRuntime.ambientMoteGroup.userData.baseOpacity * AtmosphereProgress
+      );
+    }
   }
 }
 
-/** Adds gentle life to Meadow without distracting from aiming or the restoration wave. */
+/** Adds distinct, restrained biome motion without distracting from aiming. */
 function updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds) {
   const MeadowRuntime = WorldRuntimeByIdentifier.get('meadow');
+  const EmberRuntime = WorldRuntimeByIdentifier.get('ember');
+  const FrostRuntime = WorldRuntimeByIdentifier.get('frost');
 
   for (const SurfacePropObject of MeadowRuntime.surfaceMarkerGroup.children) {
     if (SurfacePropObject.userData.swayAmount) {
@@ -1771,8 +2142,37 @@ function updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds) {
   if (MeadowRuntime.ambientMoteGroup) {
     MeadowRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.09;
     MeadowRuntime.ambientMoteGroup.rotation.z += DeltaTimeSeconds * 0.025;
-    MeadowRuntime.ambientMoteGroup.material.opacity = 0.62
-      + (Math.sin(ElapsedTimeSeconds * 2.4) * 0.12);
+    MeadowRuntime.ambientMoteGroup.material.opacity = MeadowRuntime.ambientMoteGroup.userData.baseOpacity
+      + (Math.sin(ElapsedTimeSeconds * 2.4) * 0.1);
+  }
+
+  for (const SurfacePropObject of EmberRuntime.surfaceMarkerGroup.children) {
+    const LavaMaterial = SurfacePropObject.userData.lavaMaterial
+      ?? SurfacePropObject.userData.heatMaterial;
+    if (LavaMaterial && getWorldDefinition('ember').restored) {
+      const Phase = SurfacePropObject.userData.motionPhase ?? 0;
+      const BaseIntensity = SurfacePropObject.userData.kind === 'volcano' ? 2.2 : 1.8;
+      LavaMaterial.emissiveIntensity = BaseIntensity
+        + (Math.sin((ElapsedTimeSeconds * 4.2) + Phase) * 0.24);
+    }
+  }
+  if (EmberRuntime.ambientMoteGroup) {
+    EmberRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.34;
+    EmberRuntime.ambientMoteGroup.rotation.z -= DeltaTimeSeconds * 0.09;
+  }
+
+  for (const SurfacePropObject of FrostRuntime.surfaceMarkerGroup.children) {
+    const CrystalMaterial = SurfacePropObject.userData.crystalMaterial;
+    if (CrystalMaterial && getWorldDefinition('frost').restored) {
+      const Phase = SurfacePropObject.userData.motionPhase ?? 0;
+      const BaseIntensity = SurfacePropObject.userData.kind === 'iceArch' ? 0.62 : 0.58;
+      CrystalMaterial.emissiveIntensity = BaseIntensity
+        + (Math.sin((ElapsedTimeSeconds * 1.25) + Phase) * 0.1);
+    }
+  }
+  if (FrostRuntime.ambientMoteGroup) {
+    FrostRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.045;
+    FrostRuntime.ambientMoteGroup.rotation.x += DeltaTimeSeconds * 0.018;
   }
 }
 
@@ -1957,6 +2357,12 @@ function resetGame() {
     WorldRuntime.contourRingGroup.scale.setScalar(1);
     WorldRuntime.group.rotation.set(0, 0, 0);
     WorldRuntime.group.scale.setScalar(1);
+    if (WorldRuntime.ambientMoteGroup) {
+      WorldRuntime.ambientMoteGroup.rotation.set(0, 0, 0);
+      WorldRuntime.ambientMoteGroup.material.opacity = WorldDefinition.isStartingWorld
+        ? WorldRuntime.ambientMoteGroup.userData.baseOpacity
+        : 0;
+    }
 
     for (const SurfacePropObject of WorldRuntime.surfaceMarkerGroup.children) {
       const RestorationProgress = WorldDefinition.isStartingWorld ? 1 : 0;

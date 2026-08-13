@@ -31,20 +31,21 @@ The current build includes:
 - configurable planet-wrapping restoration waves driven by spherical distance from impact;
 - staged surface growth, atmosphere bloom and world motion behind each restoration wave;
 - an authored Meadow diorama with a cottage, pond, trees, flowers, grass, stones and ambient motes;
+- distinct Ember and Frost dioramas with volcanic basalt and lava, crystalline ice, authored landmarks and biome-specific ambience;
 - miniature lighting, soft shadows and restrained biome motion;
 - out-of-bounds recovery;
 - victory and reset loops;
 - mobile-friendly pointer input;
 - framework-free physics tests.
 
-Meadow establishes the authored visual grammar and mobile-scale silhouette bar. Ember and Frost still use placeholder props and are the next worlds to receive distinct art, motion and restoration choreography.
+All three worlds now meet the authored diorama and mobile-scale silhouette bar. Ember's fast sparks and molten pulse contrast with Frost's slow glacial drift, while both reveal their luminous landmarks behind the same deterministic landing-driven restoration wave.
 
 ### Visual budget
 
 - Keep the complete scene below roughly 180 draw calls during a restoration wave.
 - Retain the device-pixel-ratio cap of 2 and the single 1024px key-light shadow map.
 - Cast dynamic shadows only from planets, the seed and large silhouette props.
-- Keep biome ambience pooled or fixed-size: Meadow uses 24 motes and flight uses 22 trail particles.
+- Keep biome ambience pooled or fixed-size: Meadow uses 24 motes, Ember 30 sparks, Frost 34 motes and flight uses 22 trail particles.
 - Avoid per-frame geometry, material, vector or particle allocation in render loops.
 - Treat stable 60 fps desktop and 30 fps mobile as the minimum final-profile targets.
 
