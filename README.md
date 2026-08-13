@@ -6,6 +6,10 @@ WORLDSEED is a five-day Three.js game-jam project for the **Tiny Worlds** theme.
 
 The committed jam scope is one polished journey across Meadow, Ember and Frost.
 
+## Play
+
+The current `main` build is deployed at **https://southers.github.io/WORLDSEED/**.
+
 ## Current checkpoint
 
 `main` begins with a preserved Day 1 gameplay proof:
