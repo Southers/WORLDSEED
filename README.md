@@ -28,13 +28,14 @@ Use a clean browser at a desktop viewport and again at a portrait mobile viewpor
 - drag-to-launch pointer controls;
 - trajectory prediction using the same physics model as the live seed;
 - world collisions and landing;
-- world restoration state;
+- configurable planet-wrapping restoration waves driven by spherical distance from impact;
+- staged surface growth, atmosphere bloom and world motion behind each restoration wave;
 - out-of-bounds recovery;
 - victory and reset loops;
 - mobile-friendly pointer input;
 - framework-free physics tests.
 
-The art is intentionally placeholder geometry at this checkpoint. The next milestones are public deployment, first-shot game-feel tuning and the restoration transformation.
+The art is intentionally placeholder geometry at this checkpoint. The public baseline, first-shot game feel and reusable restoration transformation are established; Meadow is the next submission-quality vertical slice.
 
 ## Run locally
 
