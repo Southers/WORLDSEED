@@ -32,6 +32,8 @@ The current build includes:
 - staged surface growth, atmosphere bloom and world motion behind each restoration wave;
 - an authored Meadow diorama with a cottage, pond, trees, flowers, grass, stones and ambient motes;
 - distinct Ember and Frost dioramas with volcanic basalt and lava, crystalline ice, authored landmarks and biome-specific ambience;
+- procedural Web Audio cues for aim, launch, flight, close passes, impact, restoration, failure and victory;
+- an adaptive three-layer ambient score that builds as worlds awaken, with a one-tap mute control;
 - miniature lighting, soft shadows and restrained biome motion;
 - out-of-bounds recovery;
 - victory and reset loops;
@@ -70,6 +72,7 @@ npm run check
 
 - Drag backwards from the seed and release to launch.
 - `R` resets the run.
+- `M` toggles all audio.
 - The Reset button provides the same action on touch devices.
 
 ## Jam constraint

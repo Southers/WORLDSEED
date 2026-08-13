@@ -6,7 +6,7 @@
 
 ## External art/audio assets
 
-None in the greybox checkpoint. All current geometry, materials, particles and UI are generated in code.
+None. All current geometry, materials, particles, UI, music and sound effects are generated in code. The procedural audio uses the browser Web Audio API and contains no sampled or third-party source material.
 
 Add the creator, asset title, source URL and licence here before committing any external art, audio, font or shader asset.
 
