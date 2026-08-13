@@ -34,6 +34,8 @@ The current build includes:
 - distinct Ember and Frost dioramas with volcanic basalt and lava, crystalline ice, authored landmarks and biome-specific ambience;
 - procedural Web Audio cues for aim, launch, flight, close passes, impact, restoration, failure and victory;
 - an adaptive three-layer ambient score that builds as worlds awaken, with a one-tap mute control;
+- adaptive mobile pixel density, background pause/resume and WebGL context-recovery handling;
+- versioned internal module and stylesheet URLs so rapid static deployments cannot mix stale assets;
 - miniature lighting, soft shadows and restrained biome motion;
 - out-of-bounds recovery;
 - victory and reset loops;
@@ -45,7 +47,7 @@ All three worlds now meet the authored diorama and mobile-scale silhouette bar. 
 ### Visual budget
 
 - Keep the complete scene below roughly 180 draw calls during a restoration wave.
-- Retain the device-pixel-ratio cap of 2 and the single 1024px key-light shadow map.
+- Retain the device-pixel-ratio cap of 2 (1.5 on phone-sized viewports), adaptive fill-rate fallback and the single 1024px key-light shadow map.
 - Cast dynamic shadows only from planets, the seed and large silhouette props.
 - Keep biome ambience pooled or fixed-size: Meadow uses 24 motes, Ember 30 sparks, Frost 34 motes and flight uses 22 trail particles.
 - Avoid per-frame geometry, material, vector or particle allocation in render loops.

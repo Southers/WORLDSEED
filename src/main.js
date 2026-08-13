@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js';
+import { WorldseedAudio } from './audio.js?v=20260813-5c';
 
 import {
   calculateDistanceSquared,
@@ -8,12 +8,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js';
+} from './physics.js?v=20260813-5c';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js';
+} from './restoration.js?v=20260813-5c';
 
 /**
  * WORLDSEED — Day 1 gameplay checkpoint.
@@ -38,6 +38,7 @@ const VictoryPanelElement = document.querySelector('#VictoryPanel');
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
+GameCanvas.dataset.build = '20260813-5c';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -49,6 +50,8 @@ const MinimumLaunchDragDistance = 0.22;
 const MaximumTrajectoryPredictionSteps = 520;
 const OutOfBoundsDistance = 34;
 const StartingWorldIdentifier = 'meadow';
+const MaximumDrawCallBudget = 180;
+const MinimumAdaptivePixelRatio = 1;
 
 const Scene = new THREE.Scene();
 Scene.background = new THREE.Color(0x06101a);
@@ -60,7 +63,6 @@ const Renderer = new THREE.WebGLRenderer({
   alpha: false,
   powerPreference: 'high-performance',
 });
-Renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 Renderer.outputColorSpace = THREE.SRGBColorSpace;
 Renderer.toneMapping = THREE.ACESFilmicToneMapping;
 Renderer.toneMappingExposure = 1.15;
@@ -85,6 +87,14 @@ const LocalSwayAxis = new THREE.Vector3(0, 0, 1);
 const SurfaceSwayQuaternion = new THREE.Quaternion();
 
 let PhysicsAccumulatorSeconds = 0;
+let GameElapsedTimeSeconds = 0;
+let IsPageActive = !document.hidden;
+let IsWebGLContextAvailable = true;
+let AdaptivePixelRatioCap = 2;
+let PerformanceSampleElapsedSeconds = 0;
+let PerformanceSampleFrameCount = 0;
+let PerformanceSampleDeltaSeconds = 0;
+let MaximumObservedDrawCalls = 0;
 let GamePhase = 'attached';
 let CurrentWorldIdentifier = StartingWorldIdentifier;
 let LaunchIgnoredWorldIdentifier = null;
@@ -94,7 +104,6 @@ let LastSafeSeedPosition = createVector();
 let LastSafeWorldIdentifier = StartingWorldIdentifier;
 let RecoveryTimeoutIdentifier = null;
 let StatusToastTimeoutIdentifier = null;
-let VictoryTimeoutIdentifier = null;
 let HasLaunchedOnce = false;
 let LaunchPulseLifeSeconds = 0;
 let ImpactPulseLifeSeconds = 0;
@@ -1416,10 +1425,11 @@ PullGuideLine.renderOrder = 20;
 Scene.add(PullGuideLine);
 
 /**
- * Creates a small trail behind the flying seed using a fixed pool of sprites represented
- * by meshes. Pooling avoids allocation spikes during rapid retries.
+ * Creates a small trail behind the flying seed as one instanced draw call. Pooling avoids
+ * allocation spikes and protects the restoration draw-call budget during flight.
  */
 const TrailParticlePool = [];
+const TrailParticleCount = 22;
 const TrailParticleGeometry = new THREE.SphereGeometry(0.10, 6, 4);
 const TrailParticleMaterial = new THREE.MeshBasicMaterial({
   color: 0xc9efb8,
@@ -1428,20 +1438,38 @@ const TrailParticleMaterial = new THREE.MeshBasicMaterial({
   depthWrite: false,
   blending: THREE.AdditiveBlending,
 });
+const TrailParticleMesh = new THREE.InstancedMesh(
+  TrailParticleGeometry,
+  TrailParticleMaterial,
+  TrailParticleCount,
+);
+const TrailParticleTransform = new THREE.Object3D();
+TrailParticleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+TrailParticleMesh.frustumCulled = false;
+Scene.add(TrailParticleMesh);
 
-for (let TrailParticleIndex = 0; TrailParticleIndex < 22; TrailParticleIndex += 1) {
-  const TrailParticleMesh = new THREE.Mesh(TrailParticleGeometry, TrailParticleMaterial.clone());
-  TrailParticleMesh.visible = false;
-  Scene.add(TrailParticleMesh);
-  TrailParticlePool.push({
-    mesh: TrailParticleMesh,
+for (let TrailParticleIndex = 0; TrailParticleIndex < TrailParticleCount; TrailParticleIndex += 1) {
+  const TrailParticle = {
+    index: TrailParticleIndex,
+    position: new THREE.Vector3(),
     lifeRemainingSeconds: 0,
     maximumLifeSeconds: 0.42,
-  });
+  };
+  TrailParticlePool.push(TrailParticle);
+  updateTrailParticleInstance(TrailParticle, 0);
 }
+TrailParticleMesh.instanceMatrix.needsUpdate = true;
 
 let NextTrailParticleIndex = 0;
 let TrailEmissionAccumulatorSeconds = 0;
+
+/** Writes one pooled trail particle into the shared instanced mesh. */
+function updateTrailParticleInstance(TrailParticle, Scale) {
+  TrailParticleTransform.position.copy(TrailParticle.position);
+  TrailParticleTransform.scale.setScalar(Scale);
+  TrailParticleTransform.updateMatrix();
+  TrailParticleMesh.setMatrixAt(TrailParticle.index, TrailParticleTransform.matrix);
+}
 
 /**
  * Converts pointer coordinates into the XY orbital plane.
@@ -1560,11 +1588,13 @@ function showInstruction(Title, Body) {
   InstructionTitleElement.textContent = Title;
   InstructionBodyElement.textContent = Body;
   InstructionPanelElement.classList.remove('is-hidden');
+  InstructionPanelElement.setAttribute('aria-hidden', 'false');
 }
 
 /** Hides the helper once a launch is in progress. */
 function hideInstruction() {
   InstructionPanelElement.classList.add('is-hidden');
+  InstructionPanelElement.setAttribute('aria-hidden', 'true');
 }
 
 /**
@@ -1593,7 +1623,7 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
     WorldRuntime.restorationOriginLocal,
   );
   WorldRuntime.restorationUniforms.restorationProgress.value = -0.025;
-  WorldRuntime.restorationStartedAtSeconds = Clock.elapsedTime;
+  WorldRuntime.restorationStartedAtSeconds = GameElapsedTimeSeconds;
   WorldRuntime.restorationWaveMesh.visible = true;
   WorldRuntime.contourRingGroup.visible = true;
 
@@ -1622,17 +1652,6 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
   if (RemainingWorldCount === 0) {
     GamePhase = 'victoryPending';
     hideInstruction();
-
-    if (VictoryTimeoutIdentifier !== null) {
-      window.clearTimeout(VictoryTimeoutIdentifier);
-    }
-
-    VictoryTimeoutIdentifier = window.setTimeout(() => {
-      VictoryPanelElement.hidden = false;
-      GamePhase = 'victory';
-      WorldseedSound.victory();
-      VictoryTimeoutIdentifier = null;
-    }, Math.round((WorldDefinition.restoration.durationSeconds + 0.35) * 1000));
   }
 }
 
@@ -1698,11 +1717,10 @@ function emitTrailParticle() {
   const TrailParticle = TrailParticlePool[NextTrailParticleIndex];
   NextTrailParticleIndex = (NextTrailParticleIndex + 1) % TrailParticlePool.length;
 
-  TrailParticle.mesh.position.copy(SeedGroup.position);
-  TrailParticle.mesh.scale.setScalar(0.78);
-  TrailParticle.mesh.material.opacity = 0.42;
-  TrailParticle.mesh.visible = true;
+  TrailParticle.position.copy(SeedGroup.position);
   TrailParticle.lifeRemainingSeconds = TrailParticle.maximumLifeSeconds;
+  updateTrailParticleInstance(TrailParticle, 0.78);
+  TrailParticleMesh.instanceMatrix.needsUpdate = true;
 }
 
 /**
@@ -1719,14 +1737,14 @@ function updateTrailParticles(DeltaTimeSeconds) {
     TrailParticle.lifeRemainingSeconds -= DeltaTimeSeconds;
 
     if (TrailParticle.lifeRemainingSeconds <= 0) {
-      TrailParticle.mesh.visible = false;
+      updateTrailParticleInstance(TrailParticle, 0);
       continue;
     }
 
     const LifeRatio = TrailParticle.lifeRemainingSeconds / TrailParticle.maximumLifeSeconds;
-    TrailParticle.mesh.material.opacity = LifeRatio * 0.42;
-    TrailParticle.mesh.scale.setScalar(0.42 + (LifeRatio * 0.45));
+    updateTrailParticleInstance(TrailParticle, 0.18 + (LifeRatio * 0.69));
   }
+  TrailParticleMesh.instanceMatrix.needsUpdate = true;
 }
 
 /**
@@ -2098,7 +2116,12 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
         WorldseedSound.restorationComplete(WorldDefinition.id);
         if (CurrentWorldIdentifier === WorldDefinition.id) {
           showStatusToast(`${WorldDefinition.label} AWAKENED`, 850);
-          if (GamePhase === 'restoring') {
+          if (GamePhase === 'victoryPending') {
+            VictoryPanelElement.hidden = false;
+            GamePhase = 'victory';
+            WorldseedSound.victory();
+            hideInstruction();
+          } else if (GamePhase === 'restoring') {
             GamePhase = 'attached';
             if (WorldDefinition.id === 'ember' && !getWorldDefinition('frost').restored) {
               showInstruction(
@@ -2309,8 +2332,8 @@ function updateCamera(DeltaTimeSeconds) {
   if (CameraImpactLifeSeconds > 0) {
     CameraImpactLifeSeconds = Math.max(0, CameraImpactLifeSeconds - DeltaTimeSeconds);
     const ShakeStrength = (CameraImpactLifeSeconds / 0.24) * 0.13;
-    Camera.position.x = Math.sin(Clock.elapsedTime * 93) * ShakeStrength;
-    Camera.position.y = Math.cos(Clock.elapsedTime * 77) * ShakeStrength;
+    Camera.position.x = Math.sin(GameElapsedTimeSeconds * 93) * ShakeStrength;
+    Camera.position.y = Math.cos(GameElapsedTimeSeconds * 77) * ShakeStrength;
   } else {
     Camera.position.x = 0;
     Camera.position.y = 0;
@@ -2327,8 +2350,11 @@ function resizeRenderer() {
   const ViewportHeight = window.innerHeight;
   const ViewportAspectRatio = ViewportWidth / Math.max(ViewportHeight, 1);
 
+  const SmallestViewportDimension = Math.min(ViewportWidth, ViewportHeight);
+  const DevicePixelRatioCap = SmallestViewportDimension <= 640 ? 1.5 : 2;
+  AdaptivePixelRatioCap = Math.min(AdaptivePixelRatioCap, DevicePixelRatioCap);
+  Renderer.setPixelRatio(Math.min(window.devicePixelRatio, AdaptivePixelRatioCap));
   Renderer.setSize(ViewportWidth, ViewportHeight, false);
-  Renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   Camera.aspect = ViewportAspectRatio;
 
   const RequiredWorldHeight = 29;
@@ -2343,16 +2369,63 @@ function resizeRenderer() {
 }
 
 /**
+ * Publishes a low-frequency render budget snapshot and lowers fill rate on persistently
+ * slow devices without changing the deterministic physics or authored scene.
+ */
+function updatePerformanceBudget(DeltaTimeSeconds) {
+  PerformanceSampleElapsedSeconds += DeltaTimeSeconds;
+  PerformanceSampleDeltaSeconds += DeltaTimeSeconds;
+  PerformanceSampleFrameCount += 1;
+  const PreviousMaximumDrawCalls = MaximumObservedDrawCalls;
+  MaximumObservedDrawCalls = Math.max(PreviousMaximumDrawCalls, Renderer.info.render.calls);
+
+  if (PerformanceSampleFrameCount === 1 || MaximumObservedDrawCalls > PreviousMaximumDrawCalls) {
+    GameCanvas.dataset.drawCalls = String(Renderer.info.render.calls);
+    GameCanvas.dataset.maxDrawCalls = String(MaximumObservedDrawCalls);
+    GameCanvas.dataset.triangles = String(Renderer.info.render.triangles);
+    GameCanvas.dataset.withinDrawCallBudget = String(
+      MaximumObservedDrawCalls <= MaximumDrawCallBudget,
+    );
+  }
+
+  if (PerformanceSampleElapsedSeconds < 2) {
+    return;
+  }
+
+  const AverageFrameSeconds = PerformanceSampleDeltaSeconds / PerformanceSampleFrameCount;
+  GameCanvas.dataset.drawCalls = String(Renderer.info.render.calls);
+  GameCanvas.dataset.maxDrawCalls = String(MaximumObservedDrawCalls);
+  GameCanvas.dataset.triangles = String(Renderer.info.render.triangles);
+  GameCanvas.dataset.frameRate = String(Math.round(1 / Math.max(AverageFrameSeconds, 0.001)));
+  GameCanvas.dataset.withinDrawCallBudget = String(
+    MaximumObservedDrawCalls <= MaximumDrawCallBudget,
+  );
+
+  if (
+    AverageFrameSeconds > (1 / 34)
+    && AdaptivePixelRatioCap > MinimumAdaptivePixelRatio
+    && document.visibilityState === 'visible'
+  ) {
+    AdaptivePixelRatioCap = Math.max(
+      MinimumAdaptivePixelRatio,
+      AdaptivePixelRatioCap - 0.25,
+    );
+    Renderer.setPixelRatio(Math.min(window.devicePixelRatio, AdaptivePixelRatioCap));
+    Renderer.setSize(window.innerWidth, window.innerHeight, false);
+  }
+
+  PerformanceSampleElapsedSeconds = 0;
+  PerformanceSampleDeltaSeconds = 0;
+  PerformanceSampleFrameCount = 0;
+}
+
+/**
  * Resets objective state, animations and player position to a deterministic opening shot.
  */
 function resetGame() {
   if (RecoveryTimeoutIdentifier !== null) {
     window.clearTimeout(RecoveryTimeoutIdentifier);
     RecoveryTimeoutIdentifier = null;
-  }
-  if (VictoryTimeoutIdentifier !== null) {
-    window.clearTimeout(VictoryTimeoutIdentifier);
-    VictoryTimeoutIdentifier = null;
   }
   if (StatusToastTimeoutIdentifier !== null) {
     window.clearTimeout(StatusToastTimeoutIdentifier);
@@ -2419,8 +2492,9 @@ function resetGame() {
 
   for (const TrailParticle of TrailParticlePool) {
     TrailParticle.lifeRemainingSeconds = 0;
-    TrailParticle.mesh.visible = false;
+    updateTrailParticleInstance(TrailParticle, 0);
   }
+  TrailParticleMesh.instanceMatrix.needsUpdate = true;
 
   const StartingWorldDefinition = getWorldDefinition(StartingWorldIdentifier);
   const FirstTargetWorldDefinition = getWorldDefinition('ember');
@@ -2451,6 +2525,7 @@ function resetGame() {
   LaunchIgnoredWorldIdentifier = null;
   GamePhase = 'attached';
   PhysicsAccumulatorSeconds = 0;
+  GameElapsedTimeSeconds = 0;
 
   TemporaryThreeVector.set(
     StartingWorldDefinition.position.x - FirstTargetWorldDefinition.position.x,
@@ -2478,8 +2553,14 @@ function resetGame() {
 
 /** Main frame loop. */
 function renderFrame() {
+  window.requestAnimationFrame(renderFrame);
+  if (!IsPageActive || !IsWebGLContextAvailable) {
+    return;
+  }
+
   const DeltaTimeSeconds = Math.min(Clock.getDelta(), MaximumFrameDeltaSeconds);
-  const ElapsedTimeSeconds = Clock.elapsedTime;
+  GameElapsedTimeSeconds += DeltaTimeSeconds;
+  const ElapsedTimeSeconds = GameElapsedTimeSeconds;
 
   PhysicsAccumulatorSeconds += DeltaTimeSeconds;
   while (PhysicsAccumulatorSeconds >= FixedPhysicsStepSeconds) {
@@ -2494,7 +2575,7 @@ function renderFrame() {
   updateFlightAudio();
 
   Renderer.render(Scene, Camera);
-  window.requestAnimationFrame(renderFrame);
+  updatePerformanceBudget(DeltaTimeSeconds);
 }
 
 GameCanvas.addEventListener('pointerdown', handlePointerDown, { passive: false });
@@ -2502,6 +2583,39 @@ GameCanvas.addEventListener('pointermove', handlePointerMove, { passive: false }
 GameCanvas.addEventListener('pointerup', handlePointerUp, { passive: false });
 GameCanvas.addEventListener('pointercancel', handlePointerUp, { passive: false });
 window.addEventListener('resize', resizeRenderer);
+window.addEventListener('orientationchange', () => {
+  window.setTimeout(resizeRenderer, 120);
+});
+document.addEventListener('visibilitychange', () => {
+  IsPageActive = !document.hidden;
+  WorldseedSound.setPageActive(IsPageActive);
+  if (IsPageActive) {
+    Clock.getDelta();
+    resizeRenderer();
+  } else if (IsPointerAiming) {
+    IsPointerAiming = false;
+    ActivePointerIdentifier = null;
+    GameCanvas.classList.remove('is-aiming');
+    AimPanelElement.hidden = true;
+    clearTrajectoryPreview();
+    WorldseedSound.endAim();
+    showInstruction('Aim again', 'Your shot was canceled while the game was in the background.');
+  }
+});
+GameCanvas.addEventListener('webglcontextlost', (ContextEvent) => {
+  ContextEvent.preventDefault();
+  IsWebGLContextAvailable = false;
+  WorldseedSound.setPageActive(false);
+  showStatusToast('RESTORING GRAPHICS', 1800);
+});
+GameCanvas.addEventListener('webglcontextrestored', () => {
+  IsWebGLContextAvailable = true;
+  Clock.getDelta();
+  Renderer.resetState();
+  resizeRenderer();
+  WorldseedSound.setPageActive(IsPageActive);
+  showStatusToast('GRAPHICS RESTORED', 900);
+});
 window.addEventListener('keydown', (KeyboardEventData) => {
   if (KeyboardEventData.key.toLowerCase() === 'r') {
     resetGame();
