@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { WorldseedAudio } from './audio.js';
+
 import {
   calculateDistanceSquared,
   createVector,
@@ -35,6 +37,7 @@ const StatusToastElement = document.querySelector('#StatusToast');
 const VictoryPanelElement = document.querySelector('#VictoryPanel');
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
+const AudioButtonElement = document.querySelector('#AudioButton');
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -100,6 +103,7 @@ let SeedPhysicsState = {
   position: createVector(),
   velocity: createVector(),
 };
+const WorldseedSound = new WorldseedAudio();
 
 /**
  * World definitions are intentionally compact for the greybox. `aliveColor` becomes the
@@ -1603,6 +1607,12 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
   }
 
   updateWorldCounter();
+  const RestoredWorldCount = WorldDefinitions.filter(
+    (CandidateWorldDefinition) => (
+      !CandidateWorldDefinition.isStartingWorld && CandidateWorldDefinition.restored
+    ),
+  ).length;
+  WorldseedSound.restore(WorldDefinition.id, RestoredWorldCount);
   showStatusToast(`${WorldDefinition.label} AWAKENING`, 1450);
 
   const RemainingWorldCount = WorldDefinitions.filter(
@@ -1620,6 +1630,7 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
     VictoryTimeoutIdentifier = window.setTimeout(() => {
       VictoryPanelElement.hidden = false;
       GamePhase = 'victory';
+      WorldseedSound.victory();
       VictoryTimeoutIdentifier = null;
     }, Math.round((WorldDefinition.restoration.durationSeconds + 0.35) * 1000));
   }
@@ -1639,6 +1650,7 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
   ImpactPulseMesh.visible = true;
   ImpactPulseLifeSeconds = 0.58;
   CameraImpactLifeSeconds = 0.24;
+  WorldseedSound.impact(WorldDefinition.id);
 
   SeedPhysicsState = {
     position: SurfaceRestPosition,
@@ -1742,10 +1754,12 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     AimDragVector.setLength(MaximumDragDistance);
   }
 
+  const PowerRatio = THREE.MathUtils.clamp(AimDragVector.length() / MaximumDragDistance, 0, 1);
   AimLaunchVelocity.copy(AimDragVector).multiplyScalar(LaunchVelocityPerDragUnit);
 
   if (AimDragVector.length() < MinimumLaunchDragDistance) {
     clearTrajectoryPreview();
+    WorldseedSound.updateAim(PowerRatio, false);
     return;
   }
 
@@ -1801,7 +1815,6 @@ function updateAimPreview(CurrentPointerWorldPosition) {
   TrajectoryGeometry.computeBoundingSphere();
   TrajectoryLine.visible = PreviewPointCount > 1;
 
-  const PowerRatio = THREE.MathUtils.clamp(AimDragVector.length() / MaximumDragDistance, 0, 1);
   const PowerPercentage = Math.round(PowerRatio * 100);
   AimPowerFillElement.style.width = `${PowerPercentage}%`;
   AimPowerValueElement.textContent = `${PowerPercentage}%`;
@@ -1835,6 +1848,7 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     AimLabelElement.textContent = 'PULL';
     showInstruction('Bend the path onto a grey world', 'Pull farther or change the angle.');
   }
+  WorldseedSound.updateAim(PowerRatio, Boolean(TrajectoryPrediction.collisionWorldIdentifier));
 }
 
 /**
@@ -1853,6 +1867,7 @@ function handlePointerDown(PointerEventData) {
   }
 
   IsPointerAiming = true;
+  WorldseedSound.beginAim();
   ActivePointerIdentifier = PointerEventData.pointerId;
   GameCanvas.setPointerCapture(PointerEventData.pointerId);
   GameCanvas.classList.add('is-aiming');
@@ -1903,6 +1918,7 @@ function handlePointerUp(PointerEventData) {
   clearTrajectoryPreview();
 
   if (AimDragVector.length() < MinimumLaunchDragDistance) {
+    WorldseedSound.endAim();
     showInstruction('Grab the glowing seed', 'Pull away from your target, then release.');
     return;
   }
@@ -1920,6 +1936,11 @@ function handlePointerUp(PointerEventData) {
   LaunchPulseMesh.visible = true;
   LaunchPulseLifeSeconds = 0.42;
   TrailEmissionAccumulatorSeconds = 0;
+  WorldseedSound.launch(THREE.MathUtils.clamp(
+    AimDragVector.length() / MaximumDragDistance,
+    0,
+    1,
+  ));
   hideInstruction();
 
   PointerEventData.preventDefault();
@@ -1936,6 +1957,7 @@ function recoverSeedFromVoid() {
 
   GamePhase = 'recovering';
   SeedPhysicsState.velocity = createVector();
+  WorldseedSound.failure();
   showStatusToast('LOST TO THE VOID', 700);
 
   if (RecoveryTimeoutIdentifier !== null) {
@@ -2073,6 +2095,7 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
       WorldRuntime.group.scale.setScalar(1);
       if (!WorldRuntime.restorationCompleted) {
         WorldRuntime.restorationCompleted = true;
+        WorldseedSound.restorationComplete(WorldDefinition.id);
         if (CurrentWorldIdentifier === WorldDefinition.id) {
           showStatusToast(`${WorldDefinition.label} AWAKENED`, 850);
           if (GamePhase === 'restoring') {
@@ -2109,6 +2132,25 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
       );
     }
   }
+}
+
+/** Maps live fixed-step flight state into a continuous procedural wind voice. */
+function updateFlightAudio() {
+  if (GamePhase !== 'flying') {
+    return;
+  }
+  const Speed = Math.hypot(SeedPhysicsState.velocity.x, SeedPhysicsState.velocity.y);
+  let NearestSurfaceDistance = Infinity;
+  for (const WorldDefinition of WorldDefinitions) {
+    const OffsetX = SeedPhysicsState.position.x - WorldDefinition.position.x;
+    const OffsetY = SeedPhysicsState.position.y - WorldDefinition.position.y;
+    const CentreDistance = Math.sqrt((OffsetX * OffsetX) + (OffsetY * OffsetY));
+    NearestSurfaceDistance = Math.min(
+      NearestSurfaceDistance,
+      Math.max(0, CentreDistance - WorldDefinition.radius - SeedRadius),
+    );
+  }
+  WorldseedSound.updateFlight(Speed, NearestSurfaceDistance);
 }
 
 /** Adds distinct, restrained biome motion without distracting from aiming. */
@@ -2335,6 +2377,7 @@ function resetGame() {
   VictoryPanelElement.hidden = true;
   StatusToastElement.classList.remove('is-visible');
   StatusToastElement.textContent = '';
+  WorldseedSound.reset();
 
   for (const WorldDefinition of WorldDefinitions) {
     WorldDefinition.restored = WorldDefinition.isStartingWorld;
@@ -2448,6 +2491,7 @@ function renderFrame() {
   updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateCamera(DeltaTimeSeconds);
+  updateFlightAudio();
 
   Renderer.render(Scene, Camera);
   window.requestAnimationFrame(renderFrame);
@@ -2461,10 +2505,19 @@ window.addEventListener('resize', resizeRenderer);
 window.addEventListener('keydown', (KeyboardEventData) => {
   if (KeyboardEventData.key.toLowerCase() === 'r') {
     resetGame();
+  } else if (KeyboardEventData.key.toLowerCase() === 'm') {
+    const IsMuted = WorldseedSound.toggleMute();
+    AudioButtonElement.textContent = IsMuted ? 'Audio off [M]' : 'Audio on [M]';
+    AudioButtonElement.setAttribute('aria-pressed', String(IsMuted));
   }
 });
 ResetButtonElement.addEventListener('click', resetGame);
 PlayAgainButtonElement.addEventListener('click', resetGame);
+AudioButtonElement.addEventListener('click', () => {
+  const IsMuted = WorldseedSound.toggleMute();
+  AudioButtonElement.textContent = IsMuted ? 'Audio off [M]' : 'Audio on [M]';
+  AudioButtonElement.setAttribute('aria-pressed', String(IsMuted));
+});
 
 createLighting();
 createStarField();

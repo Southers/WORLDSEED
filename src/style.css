@@ -256,7 +256,8 @@ button {
 }
 
 .victory-panel button,
-#ResetButton {
+#ResetButton,
+#AudioButton {
   pointer-events: auto;
   cursor: pointer;
 }
@@ -269,13 +270,19 @@ button {
   font-weight: 850;
 }
 
-#ResetButton {
+#ResetButton,
+#AudioButton {
   padding: 7px 10px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
   background: rgba(6, 13, 20, 0.5);
   color: rgba(238, 244, 248, 0.62);
   font-size: 11px;
+}
+
+.hud__actions {
+  display: flex;
+  gap: 8px;
 }
 
 @media (max-width: 640px) {
