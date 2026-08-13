@@ -68,6 +68,7 @@ The tiny worlds are both the subject and the mechanic. Their curved surfaces cre
 - [ ] Upload `submission/thumbnail.png` without further scaling if the expected size is 1200×600.
 - [ ] Paste the full description or the short description if a character limit applies.
 - [ ] Confirm the public URL works in a clean browser with no login.
+- [ ] Run `npm run release:online` and retain the passing output with the final regression notes.
 - [ ] Confirm the source repository is public and `CREDITS.md` is current.
 - [ ] Submit by 18 August 2026 at 23:00 UTC, preserving one hour of contingency.
 - [ ] Record the published submission URL below.
