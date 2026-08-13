@@ -1,17 +1,17 @@
 # WORLDSEED Campaign Development Plan
 
-This roadmap replaces the former five-day submission plan. It has no submission milestone or automatic deadline action.
+This roadmap replaces the former five-day prototype plan with a campaign-scale development plan. Submission preparation remains a valid final milestone, but the final external action is always user-controlled.
 
-> External submission is explicitly prohibited unless the user gives a separate future instruction.
+> Never trigger the final Submit or Publish action without the user's explicit confirmation at that moment.
 
 ## Milestone 0 — Campaign foundation
 
 - Lock the campaign premise, system loop and route-choice vocabulary.
 - Treat Meadow → Ember → Frost as the polished prologue.
 - Preserve deterministic shared physics, one-input controls, fast recovery and the restoration spectacle.
-- Remove submission activity from the working objective and documentation.
+- Replace automatic submission language with an explicit final-confirmation gate.
 
-Exit: the repository describes one coherent larger game and no active plan asks an agent to submit it.
+Exit: the repository describes one coherent larger game and clearly separates submission preparation from the user-approved final action.
 
 ## Milestone 1 — Branching-system prototype
 
@@ -69,15 +69,16 @@ Exit: one complete branching system feels like a real game chapter rather than a
 
 Exit: the campaign sustains choice, mastery and emotional progression across multiple systems.
 
-## Milestone 7 — Worldheart finale and polish
+## Milestone 7 — Worldheart finale, polish and submission readiness
 
 - Build a final system that recombines the established route vocabulary.
 - Deliver the largest restoration payoff without breaking the visual grammar.
 - Profile desktop and mobile performance across the complete campaign.
 - Test loading, resize/orientation, backgrounding, recovery, reset and completion paths.
-- Finish accessibility, credits, documentation and the public development build.
+- Finish accessibility, credits, documentation, public build, screenshots, showcase media and entry copy.
+- Verify the intended submission surface and prepare a final handoff for the user.
 
-Exit: WORLDSEED is a polished, reliable game ready for the user to decide what happens next. It is not submitted anywhere.
+Exit: WORLDSEED is a polished, reliable, submission-ready game. Stop before the final external Submit or Publish action and obtain the user's explicit confirmation.
 
 ## Validation gate for every milestone
 

@@ -10,12 +10,13 @@ Protect the core loop:
 
 The campaign should preserve the immediacy and restoration spectacle of Meadow → Ember → Frost while adding meaningful route choice, tactical small bodies, lightweight story, system-level objectives and optional mastery.
 
-## External-action boundary
+## External-action approval boundary
 
-- **Never submit WORLDSEED to a jam, competition, form, gallery, store or other external entry surface without a separate, explicit future instruction from the user.**
-- Never publish an entry, marketing post or announcement on the user's behalf.
-- Updating the existing GitHub Pages development build for playtesting is allowed when it is part of an approved implementation checkpoint; it is not permission to submit the game anywhere.
-- Retain old submission materials only as archived reference assets. Do not execute their checklist.
+- Keep submission copy, screenshots, video, credits and release checks current as the game develops.
+- It is fine to inspect rules, prepare an entry and walk the user through the final submission.
+- **Never perform the final external Submit, Publish, Enter or equivalent action without the user's explicit confirmation at that moment.**
+- Never publish a marketing post or announcement on the user's behalf without the same explicit confirmation.
+- Updating the existing GitHub Pages development build for approved playtesting is part of normal development; it does not authorise an external entry or announcement.
 
 ## Non-negotiables
 
@@ -40,6 +41,7 @@ The campaign should preserve the immediacy and restoration spectacle of Meadow �
 6. A repeatable authored-world and authored-system content pipeline.
 7. Additional systems at the established visual and gameplay bar.
 8. Mobile reliability, performance, accessibility and final polish.
+9. Submission readiness and a user-controlled final handoff.
 
 If work does not strengthen the core loop, player decisions, campaign progression or the signature awakening payoff, defer it.
 
