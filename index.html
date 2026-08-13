@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#07111d" />
   <meta name="description" content="WORLDSEED — awaken tiny worlds by slingshotting a living seed through their gravity wells." />
   <meta property="og:title" content="WORLDSEED" />
-  <meta property="og:description" content="Slingshot a living seed through gravity wells and awaken three tiny worlds." />
+  <meta property="og:description" content="Choose a route, slingshot a living seed through gravity wells and awaken a connected system of tiny worlds." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://southers.github.io/WORLDSEED/submission/thumbnail.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="600" />
   <meta name="twitter:card" content="summary_large_image" />
   <title>WORLDSEED</title>
-  <link rel="stylesheet" href="./src/style.css?v=20260813-5c" />
+  <link rel="stylesheet" href="./src/style.css?v=20260813-6a" />
 
   <!--
     Buildless import map for the five-day jam. Three.js is pinned and vendored so startup
@@ -39,13 +39,13 @@
 
       <div class="counter" aria-live="polite">
         <span class="counter__label">WORLDS</span>
-        <span id="WorldCounter" class="counter__value">0 / 2</span>
+        <span id="WorldCounter" class="counter__value">0 / 4</span>
       </div>
     </header>
 
     <section id="InstructionPanel" class="instruction-panel">
-      <strong id="InstructionTitle">Grab the glowing seed</strong>
-      <span id="InstructionBody">Pull away from EMBER, then release.</span>
+      <strong id="InstructionTitle">Choose GROVE or EMBER</strong>
+      <span id="InstructionBody">Grab the seed, pull away from a gold-ringed world, then release.</span>
     </section>
 
     <section id="AimPanel" class="aim-panel" hidden aria-live="polite">
@@ -58,10 +58,15 @@
 
     <section id="StatusToast" class="status-toast" aria-live="polite"></section>
 
+    <div id="RouteLabels" class="route-labels" aria-hidden="true">
+      <span class="route-label"></span>
+      <span class="route-label"></span>
+    </div>
+
     <section id="VictoryPanel" class="victory-panel" hidden>
-      <span class="victory-panel__eyebrow">TINY WORLD SYSTEM RESTORED</span>
+      <span class="victory-panel__eyebrow">FIRST LIGHT NETWORK RESTORED</span>
       <h1>Everything is growing again.</h1>
-      <p>Three worlds. One seed. No world left behind.</p>
+      <p>Five worlds. One seed. The path to the Worldheart is open.</p>
       <button id="PlayAgainButton" type="button">Play again</button>
     </section>
 
@@ -74,6 +79,6 @@
     </footer>
   </main>
 
-  <script type="module" src="./src/main.js?v=20260813-5c"></script>
+  <script type="module" src="./src/main.js?v=20260813-6a"></script>
 </body>
 </html>

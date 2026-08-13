@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260813-5c';
+import { WorldseedAudio } from './audio.js?v=20260813-6a';
+
+import {
+  countRestoredWorlds,
+  getRestorableWorlds,
+  getRouteChoices,
+  isSystemRestored,
+} from './campaign.js?v=20260813-6a';
 
 import {
   calculateDistanceSquared,
@@ -8,15 +15,15 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260813-5c';
+} from './physics.js?v=20260813-6a';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260813-5c';
+} from './restoration.js?v=20260813-6a';
 
 /**
- * WORLDSEED — Day 1 gameplay checkpoint.
+ * WORLDSEED — First Light branching-system prototype.
  *
  * The game deliberately keeps the simulation in a flat orbital plane while rendering
  * fully three-dimensional worlds. This produces immediately readable slingshot controls
@@ -34,11 +41,12 @@ const AimLabelElement = document.querySelector('#AimLabel');
 const AimPowerFillElement = document.querySelector('#AimPowerFill');
 const AimPowerValueElement = document.querySelector('#AimPowerValue');
 const StatusToastElement = document.querySelector('#StatusToast');
+const RouteLabelElements = [...document.querySelectorAll('.route-label')];
 const VictoryPanelElement = document.querySelector('#VictoryPanel');
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260813-5c';
+GameCanvas.dataset.build = '20260813-6a';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -85,6 +93,7 @@ const AimDragVector = new THREE.Vector3();
 const AimLaunchVelocity = new THREE.Vector3();
 const LocalSwayAxis = new THREE.Vector3(0, 0, 1);
 const SurfaceSwayQuaternion = new THREE.Quaternion();
+const RouteLabelProjection = new THREE.Vector3();
 
 let PhysicsAccumulatorSeconds = 0;
 let GameElapsedTimeSeconds = 0;
@@ -161,6 +170,27 @@ const WorldDefinitions = [
     },
   },
   {
+    id: 'grove',
+    label: 'GROVE',
+    position: createVector(-8.8, 3.0, 0),
+    radius: 2.05,
+    gravitationalParameter: 44,
+    aliveColor: new THREE.Color(0x78aa66),
+    atmosphereColor: new THREE.Color(0xb7e5a4),
+    restored: false,
+    isStartingWorld: false,
+    isPrototypeWorld: true,
+    restoration: {
+      durationSeconds: 1.85,
+      waveWidth: 0.055,
+      growthTrailWidth: 0.2,
+      waveColor: new THREE.Color(0xddffbc),
+      atmosphereOpacity: 0,
+      rotationSpeed: 0.0007,
+      surfaceVariation: 0.08,
+    },
+  },
+  {
     id: 'frost',
     label: 'FROST',
     position: createVector(0.7, 8.0, 0),
@@ -180,12 +210,33 @@ const WorldDefinitions = [
       surfaceVariation: 0.035,
     },
   },
+  {
+    id: 'tide',
+    label: 'TIDE',
+    position: createVector(9.7, 6.0, 0),
+    radius: 2.15,
+    gravitationalParameter: 48,
+    aliveColor: new THREE.Color(0x4d91aa),
+    atmosphereColor: new THREE.Color(0x9ce7ef),
+    restored: false,
+    isStartingWorld: false,
+    isPrototypeWorld: true,
+    restoration: {
+      durationSeconds: 1.95,
+      waveWidth: 0.052,
+      growthTrailWidth: 0.2,
+      waveColor: new THREE.Color(0xb9fbff),
+      atmosphereOpacity: 0,
+      rotationSpeed: 0.00085,
+      surfaceVariation: 0.06,
+    },
+  },
 ];
 
 const WorldRuntimeByIdentifier = new Map();
 const DeadWorldColor = new THREE.Color(0x575d60);
 const DarkWorldColor = new THREE.Color(0x2c3337);
-const RestorableWorldCount = WorldDefinitions.filter((WorldDefinition) => !WorldDefinition.isStartingWorld).length;
+const RestorableWorldCount = getRestorableWorlds(WorldDefinitions).length;
 
 /**
  * Adds restrained scene lighting. The tiny-world art pass can later replace this with a
@@ -478,7 +529,11 @@ function createRestorationWaveShell(WorldDefinition, RestorationUniforms) {
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
   });
-  const WaveGeometry = new THREE.SphereGeometry(WorldDefinition.radius * 1.018, 64, 40);
+  const WaveGeometry = new THREE.SphereGeometry(
+    WorldDefinition.radius * 1.018,
+    WorldDefinition.isPrototypeWorld ? 32 : 64,
+    WorldDefinition.isPrototypeWorld ? 20 : 40,
+  );
   const WaveMesh = new THREE.Mesh(WaveGeometry, WaveMaterial);
   WaveMesh.visible = false;
   WaveMesh.renderOrder = 5;
@@ -1209,7 +1264,10 @@ function createWorld(WorldDefinition) {
     WorldDefinition.position.z,
   );
 
-  const SurfaceGeometry = new THREE.IcosahedronGeometry(WorldDefinition.radius, 5);
+  const SurfaceGeometry = new THREE.IcosahedronGeometry(
+    WorldDefinition.radius,
+    WorldDefinition.isPrototypeWorld ? 3 : 5,
+  );
   const SurfaceRestoration = createRestorationSurfaceMaterial(WorldDefinition);
   const SurfaceMaterial = SurfaceRestoration.material;
   const SurfaceMesh = new THREE.Mesh(SurfaceGeometry, SurfaceMaterial);
@@ -1223,29 +1281,44 @@ function createWorld(WorldDefinition) {
   );
   WorldGroup.add(RestorationWaveShell.mesh);
 
-  const AtmosphereGeometry = new THREE.SphereGeometry(WorldDefinition.radius * 1.09, 48, 32);
-  const AtmosphereMaterial = new THREE.MeshBasicMaterial({
-    color: WorldDefinition.atmosphereColor,
-    transparent: true,
-    opacity: WorldDefinition.restored ? 0.10 : 0.025,
-    side: THREE.BackSide,
-    depthWrite: false,
-  });
-  const AtmosphereMesh = new THREE.Mesh(AtmosphereGeometry, AtmosphereMaterial);
-  WorldGroup.add(AtmosphereMesh);
+  let AtmosphereMaterial;
+  let AtmosphereMesh;
+  let ContourRingGroup;
+  if (WorldDefinition.isPrototypeWorld) {
+    /** Greybox choices use the restoration shader but deliberately add no extra draw calls. */
+    AtmosphereMaterial = { opacity: 0 };
+    AtmosphereMesh = new THREE.Object3D();
+    ContourRingGroup = new THREE.Group();
+  } else {
+    const AtmosphereGeometry = new THREE.SphereGeometry(WorldDefinition.radius * 1.09, 48, 32);
+    AtmosphereMaterial = new THREE.MeshBasicMaterial({
+      color: WorldDefinition.atmosphereColor,
+      transparent: true,
+      opacity: WorldDefinition.restored ? 0.10 : 0.025,
+      side: THREE.BackSide,
+      depthWrite: false,
+    });
+    AtmosphereMesh = new THREE.Mesh(AtmosphereGeometry, AtmosphereMaterial);
+    WorldGroup.add(AtmosphereMesh);
 
-  const ContourRingGroup = createWorldContourRings(WorldDefinition.radius, WorldDefinition.atmosphereColor);
-  ContourRingGroup.visible = WorldDefinition.restored;
-  WorldGroup.add(ContourRingGroup);
+    ContourRingGroup = createWorldContourRings(
+      WorldDefinition.radius,
+      WorldDefinition.atmosphereColor,
+    );
+    ContourRingGroup.visible = WorldDefinition.restored;
+    WorldGroup.add(ContourRingGroup);
+  }
 
   const SurfacePropFactories = {
     meadow: createMeadowSurfaceProps,
     ember: createEmberSurfaceProps,
     frost: createFrostSurfaceProps,
   };
-  const SurfaceMarkerGroup = (
-    SurfacePropFactories[WorldDefinition.id] ?? createPlaceholderSurfaceProps
-  )(WorldDefinition);
+  const SurfaceMarkerGroup = WorldDefinition.isPrototypeWorld
+    ? new THREE.Group()
+    : (
+      SurfacePropFactories[WorldDefinition.id] ?? createPlaceholderSurfaceProps
+    )(WorldDefinition);
 
   for (const SurfacePropObject of SurfaceMarkerGroup.children) {
     const CastsUsefulShadow = [
@@ -1262,16 +1335,22 @@ function createWorld(WorldDefinition) {
   }
 
   WorldGroup.add(SurfaceMarkerGroup);
-  const AmbientMoteGroup = WorldDefinition.id === 'meadow'
-    ? createMeadowMotes(WorldDefinition)
-    : createBiomeMotes(
-      WorldDefinition,
-      WorldDefinition.id === 'ember' ? 30 : 34,
-      WorldDefinition.id === 'ember' ? 0xff7b32 : 0xcdf8ff,
-      WorldDefinition.id === 'ember' ? 0.105 : 0.085,
-      WorldDefinition.id === 'ember' ? 0.78 : 0.64,
+  const AmbientMoteGroup = WorldDefinition.isPrototypeWorld
+    ? null
+    : (
+      WorldDefinition.id === 'meadow'
+        ? createMeadowMotes(WorldDefinition)
+        : createBiomeMotes(
+          WorldDefinition,
+          WorldDefinition.id === 'ember' ? 30 : 34,
+          WorldDefinition.id === 'ember' ? 0xff7b32 : 0xcdf8ff,
+          WorldDefinition.id === 'ember' ? 0.105 : 0.085,
+          WorldDefinition.id === 'ember' ? 0.78 : 0.64,
+        )
     );
-  AmbientMoteGroup.userData.baseOpacity ??= 0.72;
+  if (AmbientMoteGroup) {
+    AmbientMoteGroup.userData.baseOpacity ??= 0.72;
+  }
   if (AmbientMoteGroup) {
     WorldGroup.add(AmbientMoteGroup);
   }
@@ -1298,18 +1377,25 @@ for (const WorldDefinition of WorldDefinitions) {
   createWorld(WorldDefinition);
 }
 
-/** A soft target beacon makes the intended first shot legible without adding a menu. */
-const TargetBeaconGeometry = new THREE.RingGeometry(3.55, 3.68, 72);
+/** Two instanced beacons reveal suggested branches without turning choice into a menu. */
+const TargetBeaconGeometry = new THREE.RingGeometry(1, 1.04, 72);
 const TargetBeaconMaterial = new THREE.MeshBasicMaterial({
-  color: 0xd9f6cc,
+  color: 0xffd98a,
   transparent: true,
   opacity: 0.18,
   side: THREE.DoubleSide,
   depthWrite: false,
   blending: THREE.AdditiveBlending,
 });
-const TargetBeaconMesh = new THREE.Mesh(TargetBeaconGeometry, TargetBeaconMaterial);
-TargetBeaconMesh.position.set(7.8, -3.3, 0.08);
+const TargetBeaconMesh = new THREE.InstancedMesh(
+  TargetBeaconGeometry,
+  TargetBeaconMaterial,
+  Math.max(2, RestorableWorldCount),
+);
+const TargetBeaconTransform = new THREE.Object3D();
+TargetBeaconMesh.count = 0;
+TargetBeaconMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+TargetBeaconMesh.frustumCulled = false;
 Scene.add(TargetBeaconMesh);
 
 /** The seed is intentionally bright and oversized enough to remain readable on mobile. */
@@ -1520,6 +1606,87 @@ function getWorldDefinition(WorldIdentifier) {
   return WorldDefinitions.find((WorldDefinition) => WorldDefinition.id === WorldIdentifier);
 }
 
+/** Reveals the nearest useful routes while leaving every physical destination valid. */
+function showRouteChoiceInstruction() {
+  const RouteChoices = getRouteChoices(WorldDefinitions, CurrentWorldIdentifier, 2);
+  if (RouteChoices.length === 0) {
+    showInstruction('The First Light network is awake', 'The path to the Worldheart is opening.');
+    return;
+  }
+
+  if (RouteChoices.length === 1) {
+    showInstruction(
+      RouteChoices[0].label + ' remains',
+      'Use the bright path to find your final landing.',
+    );
+    return;
+  }
+
+  showInstruction(
+    'Choose ' + RouteChoices[0].label + ' or ' + RouteChoices[1].label,
+    'Gold rings suggest routes — every landing becomes your next launch point.',
+  );
+}
+
+/** Updates the two suggested destination rings as a single draw call. */
+function updateTargetBeacons(ElapsedTimeSeconds) {
+  const ShouldShowChoices = GamePhase === 'attached';
+  const RouteChoices = ShouldShowChoices
+    ? getRouteChoices(WorldDefinitions, CurrentWorldIdentifier, 2)
+    : [];
+  const PulseScale = 1 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.025);
+
+  TargetBeaconMesh.count = RouteChoices.length;
+  TargetBeaconMesh.visible = RouteChoices.length > 0;
+  TargetBeaconMaterial.opacity = 0.13 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.055);
+
+  for (let ChoiceIndex = 0; ChoiceIndex < RouteChoices.length; ChoiceIndex += 1) {
+    const WorldDefinition = RouteChoices[ChoiceIndex];
+    const RingRadius = (WorldDefinition.radius + 0.55) * PulseScale;
+    TargetBeaconTransform.position.set(
+      WorldDefinition.position.x,
+      WorldDefinition.position.y,
+      0.08,
+    );
+    TargetBeaconTransform.rotation.set(0, 0, (
+      (-ElapsedTimeSeconds * 0.35) + (ChoiceIndex * Math.PI * 0.18)
+    ));
+    TargetBeaconTransform.scale.setScalar(RingRadius);
+    TargetBeaconTransform.updateMatrix();
+    TargetBeaconMesh.setMatrixAt(ChoiceIndex, TargetBeaconTransform.matrix);
+  }
+  TargetBeaconMesh.instanceMatrix.needsUpdate = RouteChoices.length > 0;
+}
+
+/** Projects suggested world names into the HUD without spending WebGL draw calls. */
+function updateRouteLabels() {
+  const RouteChoices = GamePhase === 'attached'
+    ? getRouteChoices(WorldDefinitions, CurrentWorldIdentifier, RouteLabelElements.length)
+    : [];
+
+  for (let LabelIndex = 0; LabelIndex < RouteLabelElements.length; LabelIndex += 1) {
+    const RouteLabelElement = RouteLabelElements[LabelIndex];
+    const WorldDefinition = RouteChoices[LabelIndex];
+    if (!WorldDefinition) {
+      RouteLabelElement.textContent = '';
+      continue;
+    }
+
+    RouteLabelProjection.set(
+      WorldDefinition.position.x,
+      WorldDefinition.position.y + WorldDefinition.radius + 0.72,
+      0,
+    ).project(Camera);
+    RouteLabelElement.textContent = WorldDefinition.label;
+    RouteLabelElement.style.left = Math.round(
+      (RouteLabelProjection.x * 0.5 + 0.5) * window.innerWidth,
+    ) + 'px';
+    RouteLabelElement.style.top = Math.round(
+      (-RouteLabelProjection.y * 0.5 + 0.5) * window.innerHeight,
+    ) + 'px';
+  }
+}
+
 /**
  * Computes a stable resting point on a world's surface.
  *
@@ -1552,9 +1719,7 @@ function calculateSurfaceRestPosition(WorldDefinition, ImpactPosition) {
  * so it acts as the player's launch platform rather than as an objective.
  */
 function updateWorldCounter() {
-  const RestoredWorldCount = WorldDefinitions.filter(
-    (WorldDefinition) => !WorldDefinition.isStartingWorld && WorldDefinition.restored,
-  ).length;
+  const RestoredWorldCount = countRestoredWorlds(WorldDefinitions);
   WorldCounterElement.textContent = `${RestoredWorldCount} / ${RestorableWorldCount}`;
 }
 
@@ -1637,19 +1802,11 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
   }
 
   updateWorldCounter();
-  const RestoredWorldCount = WorldDefinitions.filter(
-    (CandidateWorldDefinition) => (
-      !CandidateWorldDefinition.isStartingWorld && CandidateWorldDefinition.restored
-    ),
-  ).length;
+  const RestoredWorldCount = countRestoredWorlds(WorldDefinitions);
   WorldseedSound.restore(WorldDefinition.id, RestoredWorldCount);
   showStatusToast(`${WorldDefinition.label} AWAKENING`, 1450);
 
-  const RemainingWorldCount = WorldDefinitions.filter(
-    (CandidateWorldDefinition) => !CandidateWorldDefinition.isStartingWorld && !CandidateWorldDefinition.restored,
-  ).length;
-
-  if (RemainingWorldCount === 0) {
+  if (isSystemRestored(WorldDefinitions)) {
     GamePhase = 'victoryPending';
     hideInstruction();
   }
@@ -1696,17 +1853,8 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
     );
   } else if (WasAlreadyRestored && GamePhase !== 'victory' && GamePhase !== 'victoryPending') {
     GamePhase = 'attached';
-    if (WorldDefinition.id === 'ember' && !getWorldDefinition('frost').restored) {
-      showInstruction(
-        'Ember is awake — aim for Frost',
-        'Pull down and right until the landing ring appears.',
-      );
-    } else {
-      showInstruction(
-        'Safe landing',
-        'Pull away from the next grey world, then release.',
-      );
-    }
+    showStatusToast('SAFE LANDING', 700);
+    showRouteChoiceInstruction();
   }
 }
 
@@ -1839,13 +1987,18 @@ function updateAimPreview(CurrentPointerWorldPosition) {
 
   if (TrajectoryPrediction.collisionWorldIdentifier) {
     const LandingWorldDefinition = getWorldDefinition(TrajectoryPrediction.collisionWorldIdentifier);
-    TrajectoryMaterial.color.set(0xd9f6cc);
+    const IsNewWorldLanding = !LandingWorldDefinition.restored;
+    TrajectoryMaterial.color.set(IsNewWorldLanding ? 0xffd98a : 0xbceca8);
     TrajectoryMaterial.opacity = 0.82;
+    LandingMarkerMaterial.color.set(IsNewWorldLanding ? 0xffd98a : 0xbceca8);
     AimPanelElement.classList.add('is-locked');
-    AimLabelElement.textContent = 'LANDING LOCKED';
+    AimLabelElement.textContent = IsNewWorldLanding ? 'NEW WORLD LOCKED' : 'SAFE LANDING';
     showInstruction(
-      `Release to awaken ${LandingWorldDefinition.label}`,
-      'The bright ring marks your landing.',
+      (IsNewWorldLanding ? 'Release to awaken ' : 'Release to land on ')
+        + LandingWorldDefinition.label,
+      IsNewWorldLanding
+        ? 'Gold means a new world. This landing becomes your next launch point.'
+        : 'Green means a restored safe landing.',
     );
     const LandingDirection = TemporaryThreeVector.set(
       FinalPredictionPoint.x - LandingWorldDefinition.position.x,
@@ -1864,7 +2017,7 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     LandingMarkerMesh.visible = false;
     AimPanelElement.classList.remove('is-locked');
     AimLabelElement.textContent = 'PULL';
-    showInstruction('Bend the path onto a grey world', 'Pull farther or change the angle.');
+    showInstruction('No landing yet', 'Pull farther or change the angle until the path turns gold or green.');
   }
   WorldseedSound.updateAim(PowerRatio, Boolean(TrajectoryPrediction.collisionWorldIdentifier));
 }
@@ -1999,7 +2152,7 @@ function recoverSeedFromVoid() {
     CurrentWorldIdentifier = LastSafeWorldIdentifier;
     LaunchIgnoredWorldIdentifier = null;
     GamePhase = 'attached';
-    showInstruction('Try another angle', 'Use the bright path to bend around gravity wells.');
+    showInstruction('Try another angle', 'Use the gold route rings and wait for a landing lock.');
     RecoveryTimeoutIdentifier = null;
   }, 420);
 }
@@ -2123,17 +2276,7 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
             hideInstruction();
           } else if (GamePhase === 'restoring') {
             GamePhase = 'attached';
-            if (WorldDefinition.id === 'ember' && !getWorldDefinition('frost').restored) {
-              showInstruction(
-                'Ember is awake — aim for Frost',
-                'Pull down and right until the landing ring appears.',
-              );
-            } else {
-              showInstruction(
-                'Drag the seed backwards',
-                'Release to launch. Let gravity do the rest.',
-              );
-            }
+            showRouteChoiceInstruction();
           }
         }
       }
@@ -2298,14 +2441,9 @@ function updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds) {
     && CurrentWorldIdentifier === StartingWorldIdentifier
     && !HasLaunchedOnce;
   PullGuideLine.visible = IsOpeningCoachVisible;
-  TargetBeaconMesh.visible = !getWorldDefinition('ember').restored;
+  updateTargetBeacons(ElapsedTimeSeconds);
   if (IsOpeningCoachVisible) {
     PullGuideMaterial.dashOffset -= DeltaTimeSeconds * 0.9;
-  }
-  if (TargetBeaconMesh.visible) {
-    TargetBeaconMesh.rotation.z -= DeltaTimeSeconds * 0.35;
-    TargetBeaconMaterial.opacity = 0.13 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.055);
-    TargetBeaconMesh.scale.setScalar(1 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.025));
   }
 }
 
@@ -2545,10 +2683,14 @@ function resetGame() {
   PullGuideGeometry.setFromPoints([PullGuideStart, PullGuideEnd]);
   PullGuideLine.computeLineDistances();
   PullGuideLine.visible = true;
-  TargetBeaconMesh.visible = true;
 
   updateWorldCounter();
-  showInstruction('Grab the glowing seed', 'Pull away from EMBER, then release.');
+  updateTargetBeacons(0);
+  const OpeningRouteChoices = getRouteChoices(WorldDefinitions, StartingWorldIdentifier, 2);
+  showInstruction(
+    'Choose ' + OpeningRouteChoices[0].label + ' or ' + OpeningRouteChoices[1].label,
+    'Grab the seed, pull away from a gold-ringed world, then release.',
+  );
 }
 
 /** Main frame loop. */
@@ -2572,6 +2714,7 @@ function renderFrame() {
   updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateCamera(DeltaTimeSeconds);
+  updateRouteLabels();
   updateFlightAudio();
 
   Renderer.render(Scene, Camera);

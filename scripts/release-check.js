@@ -18,6 +18,7 @@ const RequiredTextFiles = [
   'SUBMISSION.md',
   'index.html',
   'src/audio.js',
+  'src/campaign.js',
   'src/main.js',
   'src/physics.js',
   'src/restoration.js',
@@ -125,6 +126,7 @@ async function verifyLocalRelease() {
 
   const MainJavaScript = TextByPath.get('src/main.js');
   requirePattern(MainJavaScript, /\.\/audio\.js\?v=[^"']+/, 'main audio import');
+  requirePattern(MainJavaScript, /\.\/campaign\.js\?v=[^"']+/, 'main campaign import');
   requirePattern(MainJavaScript, /\.\/physics\.js\?v=[^"']+/, 'main physics import');
   requirePattern(MainJavaScript, /\.\/restoration\.js\?v=[^"']+/, 'main restoration import');
   requireText(MainJavaScript, "dataset.build = '", 'main build marker');
