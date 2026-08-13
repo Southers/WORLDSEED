@@ -7,6 +7,11 @@ import {
   predictTrajectory,
   simulatePhysicsStep,
 } from './physics.js';
+import {
+  calculateNormalizedSphericalDistance,
+  calculateRestorationWaveProgress,
+  calculateStagedGrowthProgress,
+} from './restoration.js';
 
 /**
  * WORLDSEED — Day 1 gameplay checkpoint.
@@ -108,6 +113,14 @@ const WorldDefinitions = [
     atmosphereColor: new THREE.Color(0x9bcfb4),
     restored: true,
     isStartingWorld: true,
+    restoration: {
+      durationSeconds: 2.2,
+      waveWidth: 0.045,
+      growthTrailWidth: 0.18,
+      waveColor: new THREE.Color(0xe8ffc5),
+      atmosphereOpacity: 0.15,
+      rotationSpeed: 0.0011,
+    },
   },
   {
     id: 'ember',
@@ -119,6 +132,14 @@ const WorldDefinitions = [
     atmosphereColor: new THREE.Color(0xffbe78),
     restored: false,
     isStartingWorld: false,
+    restoration: {
+      durationSeconds: 2.35,
+      waveWidth: 0.05,
+      growthTrailWidth: 0.18,
+      waveColor: new THREE.Color(0xffdfa1),
+      atmosphereOpacity: 0.16,
+      rotationSpeed: 0.00125,
+    },
   },
   {
     id: 'frost',
@@ -130,6 +151,14 @@ const WorldDefinitions = [
     atmosphereColor: new THREE.Color(0xbbe8f5),
     restored: false,
     isStartingWorld: false,
+    restoration: {
+      durationSeconds: 2.65,
+      waveWidth: 0.042,
+      growthTrailWidth: 0.2,
+      waveColor: new THREE.Color(0xe4fbff),
+      atmosphereOpacity: 0.18,
+      rotationSpeed: 0.001,
+    },
   },
 ];
 
@@ -228,6 +257,145 @@ function createWorldContourRings(WorldRadius, RingColor) {
 }
 
 /**
+ * Extends a standard lit material with the spherical dead-to-alive colour wave.
+ *
+ * @param {object} WorldDefinition - Gameplay and visual definition for the world.
+ * @returns {{material:THREE.MeshStandardMaterial, uniforms:object}} Material and live uniforms.
+ */
+function createRestorationSurfaceMaterial(WorldDefinition) {
+  const RestorationUniforms = {
+    restorationOrigin: { value: new THREE.Vector3(1, 0, 0) },
+    restorationProgress: { value: WorldDefinition.restored ? 1.2 : -0.1 },
+    restorationWaveWidth: { value: WorldDefinition.restoration.waveWidth },
+    deadColor: { value: DeadWorldColor.clone() },
+    aliveColor: { value: WorldDefinition.aliveColor.clone() },
+    waveColor: { value: WorldDefinition.restoration.waveColor.clone() },
+  };
+  const SurfaceMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.88,
+    metalness: 0.02,
+    flatShading: false,
+  });
+
+  SurfaceMaterial.onBeforeCompile = (Shader) => {
+    Object.assign(Shader.uniforms, RestorationUniforms);
+    Shader.vertexShader = Shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying vec3 vRestorationNormal;',
+      )
+      .replace(
+        '#include <beginnormal_vertex>',
+        '#include <beginnormal_vertex>\nvRestorationNormal = normalize(objectNormal);',
+      );
+    Shader.fragmentShader = Shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vRestorationNormal;
+        uniform vec3 restorationOrigin;
+        uniform float restorationProgress;
+        uniform float restorationWaveWidth;
+        uniform vec3 deadColor;
+        uniform vec3 aliveColor;
+        uniform vec3 waveColor;`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        float restorationDistance = acos(clamp(dot(
+          normalize(vRestorationNormal),
+          normalize(restorationOrigin)
+        ), -1.0, 1.0)) / PI;
+        float restoredSurface = 1.0 - smoothstep(
+          restorationProgress - restorationWaveWidth,
+          restorationProgress + restorationWaveWidth,
+          restorationDistance
+        );
+        float activeRestorationWave = 1.0 - step(1.001, restorationProgress);
+        float restorationBand = 1.0 - smoothstep(
+          restorationWaveWidth * 0.35,
+          restorationWaveWidth * 2.2,
+          abs(restorationDistance - restorationProgress)
+        );
+        diffuseColor.rgb = mix(deadColor, aliveColor, restoredSurface);
+        diffuseColor.rgb += waveColor * restorationBand * activeRestorationWave * 0.9;`,
+      );
+  };
+  SurfaceMaterial.customProgramCacheKey = () => 'worldseed-restoration-surface-v1';
+
+  return { material: SurfaceMaterial, uniforms: RestorationUniforms };
+}
+
+/**
+ * Creates a transparent additive shell that blooms along the active wavefront.
+ *
+ * @param {object} WorldDefinition - Gameplay and visual definition for the world.
+ * @param {object} RestorationUniforms - Uniforms shared with the surface material.
+ * @returns {{mesh:THREE.Mesh, material:THREE.ShaderMaterial}} Shell render components.
+ */
+function createRestorationWaveShell(WorldDefinition, RestorationUniforms) {
+  const WaveMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      restorationOrigin: RestorationUniforms.restorationOrigin,
+      restorationProgress: RestorationUniforms.restorationProgress,
+      restorationWaveWidth: RestorationUniforms.restorationWaveWidth,
+      waveColor: RestorationUniforms.waveColor,
+    },
+    vertexShader: `
+      varying vec3 vSurfaceNormal;
+      varying vec3 vViewNormal;
+      varying vec3 vViewDirection;
+
+      void main() {
+        vSurfaceNormal = normalize(normal);
+        vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewNormal = normalize(normalMatrix * normal);
+        vViewDirection = normalize(-viewPosition.xyz);
+        gl_Position = projectionMatrix * viewPosition;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vSurfaceNormal;
+      varying vec3 vViewNormal;
+      varying vec3 vViewDirection;
+      uniform vec3 restorationOrigin;
+      uniform float restorationProgress;
+      uniform float restorationWaveWidth;
+      uniform vec3 waveColor;
+
+      void main() {
+        float restorationDistance = acos(clamp(dot(
+          normalize(vSurfaceNormal),
+          normalize(restorationOrigin)
+        ), -1.0, 1.0)) / 3.141592653589793;
+        float waveBand = 1.0 - smoothstep(
+          restorationWaveWidth * 0.45,
+          restorationWaveWidth * 1.8,
+          abs(restorationDistance - restorationProgress)
+        );
+        float fresnel = pow(1.0 - max(dot(vViewNormal, vViewDirection), 0.0), 2.0);
+        float activeWave = step(-0.001, restorationProgress)
+          * (1.0 - step(1.001, restorationProgress));
+        float alpha = waveBand * (0.52 + (fresnel * 0.58)) * activeWave;
+        gl_FragColor = vec4(waveColor, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const WaveGeometry = new THREE.SphereGeometry(WorldDefinition.radius * 1.018, 64, 40);
+  const WaveMesh = new THREE.Mesh(WaveGeometry, WaveMaterial);
+  WaveMesh.visible = false;
+  WaveMesh.renderOrder = 5;
+
+  return { mesh: WaveMesh, material: WaveMaterial };
+}
+
+/**
  * Creates one world and records its render-time components by identifier.
  *
  * @param {object} WorldDefinition - Gameplay and visual definition for the world.
@@ -241,14 +409,16 @@ function createWorld(WorldDefinition) {
   );
 
   const SurfaceGeometry = new THREE.IcosahedronGeometry(WorldDefinition.radius, 5);
-  const SurfaceMaterial = new THREE.MeshStandardMaterial({
-    color: WorldDefinition.restored ? WorldDefinition.aliveColor : DeadWorldColor,
-    roughness: 0.88,
-    metalness: 0.02,
-    flatShading: false,
-  });
+  const SurfaceRestoration = createRestorationSurfaceMaterial(WorldDefinition);
+  const SurfaceMaterial = SurfaceRestoration.material;
   const SurfaceMesh = new THREE.Mesh(SurfaceGeometry, SurfaceMaterial);
   WorldGroup.add(SurfaceMesh);
+
+  const RestorationWaveShell = createRestorationWaveShell(
+    WorldDefinition,
+    SurfaceRestoration.uniforms,
+  );
+  WorldGroup.add(RestorationWaveShell.mesh);
 
   const AtmosphereGeometry = new THREE.SphereGeometry(WorldDefinition.radius * 1.09, 48, 32);
   const AtmosphereMaterial = new THREE.MeshBasicMaterial({
@@ -288,7 +458,11 @@ function createWorld(WorldDefinition) {
 
     MarkerMesh.position.copy(SurfaceDirection).multiplyScalar(WorldDefinition.radius + 0.22);
     MarkerMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), SurfaceDirection);
-    MarkerMesh.scale.setScalar(0.9 + ((MarkerIndex % 3) * 0.2));
+    const MarkerBaseScale = 0.9 + ((MarkerIndex % 3) * 0.2);
+    MarkerMesh.scale.setScalar(MarkerBaseScale);
+    MarkerMesh.userData.surfaceDirection = SurfaceDirection.clone();
+    MarkerMesh.userData.baseScale = MarkerBaseScale;
+    MarkerMesh.userData.restorationDistance = WorldDefinition.restored ? 0 : 1;
     SurfaceMarkerGroup.add(MarkerMesh);
   }
 
@@ -299,10 +473,16 @@ function createWorld(WorldDefinition) {
     group: WorldGroup,
     surfaceMesh: SurfaceMesh,
     surfaceMaterial: SurfaceMaterial,
+    restorationUniforms: SurfaceRestoration.uniforms,
+    restorationWaveMesh: RestorationWaveShell.mesh,
     atmosphereMaterial: AtmosphereMaterial,
+    atmosphereMesh: AtmosphereMesh,
     contourRingGroup: ContourRingGroup,
     surfaceMarkerGroup: SurfaceMarkerGroup,
+    aliveMarkerColor: WorldDefinition.aliveColor.clone().offsetHSL(0, 0, 0.16),
+    restorationOriginLocal: new THREE.Vector3(1, 0, 0),
     restorationStartedAtSeconds: WorldDefinition.restored ? -Infinity : null,
+    restorationCompleted: WorldDefinition.restored,
   });
 }
 
@@ -591,19 +771,43 @@ function hideInstruction() {
  * Starts the lightweight greybox restoration animation and marks objective state.
  *
  * @param {object} WorldDefinition - World that has just been awakened.
+ * @param {{x:number,y:number,z:number}} ImpactPosition - World-space landing point.
  */
-function restoreWorld(WorldDefinition) {
+function restoreWorld(WorldDefinition, ImpactPosition) {
   if (WorldDefinition.restored) {
     return;
   }
 
   WorldDefinition.restored = true;
   const WorldRuntime = WorldRuntimeByIdentifier.get(WorldDefinition.id);
+  GamePhase = 'restoring';
+  WorldRuntime.group.updateWorldMatrix(true, false);
+  WorldRuntime.restorationOriginLocal.copy(
+    WorldRuntime.group.worldToLocal(new THREE.Vector3(
+      ImpactPosition.x,
+      ImpactPosition.y,
+      ImpactPosition.z,
+    )),
+  ).normalize();
+  WorldRuntime.restorationUniforms.restorationOrigin.value.copy(
+    WorldRuntime.restorationOriginLocal,
+  );
+  WorldRuntime.restorationUniforms.restorationProgress.value = -0.025;
   WorldRuntime.restorationStartedAtSeconds = Clock.elapsedTime;
+  WorldRuntime.restorationWaveMesh.visible = true;
   WorldRuntime.contourRingGroup.visible = true;
 
+  for (const MarkerMesh of WorldRuntime.surfaceMarkerGroup.children) {
+    MarkerMesh.userData.restorationDistance = calculateNormalizedSphericalDistance(
+      WorldRuntime.restorationOriginLocal,
+      MarkerMesh.userData.surfaceDirection,
+    );
+    MarkerMesh.scale.setScalar(MarkerMesh.userData.baseScale * 0.05);
+    MarkerMesh.material.color.copy(DarkWorldColor);
+  }
+
   updateWorldCounter();
-  showStatusToast(`${WorldDefinition.label} AWAKENED`, 1050);
+  showStatusToast(`${WorldDefinition.label} AWAKENING`, 1450);
 
   const RemainingWorldCount = WorldDefinitions.filter(
     (CandidateWorldDefinition) => !CandidateWorldDefinition.isStartingWorld && !CandidateWorldDefinition.restored,
@@ -621,7 +825,7 @@ function restoreWorld(WorldDefinition) {
       VictoryPanelElement.hidden = false;
       GamePhase = 'victory';
       VictoryTimeoutIdentifier = null;
-    }, 1350);
+    }, Math.round((WorldDefinition.restoration.durationSeconds + 0.35) * 1000));
   }
 }
 
@@ -655,14 +859,26 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
   );
   LaunchIgnoredWorldIdentifier = null;
 
-  restoreWorld(WorldDefinition);
+  const WasAlreadyRestored = WorldDefinition.restored;
+  restoreWorld(WorldDefinition, ImpactPosition);
 
-  if (GamePhase !== 'victoryPending' && GamePhase !== 'victory') {
+  if (GamePhase === 'restoring') {
+    showInstruction(
+      `Life is racing around ${WorldDefinition.label}`,
+      'Watch the wave wrap around the tiny world.',
+    );
+  } else if (WasAlreadyRestored && GamePhase !== 'victory' && GamePhase !== 'victoryPending') {
     GamePhase = 'attached';
     if (WorldDefinition.id === 'ember' && !getWorldDefinition('frost').restored) {
-      showInstruction('Ember is awake — aim for Frost', 'Pull down and right until the landing ring appears.');
+      showInstruction(
+        'Ember is awake — aim for Frost',
+        'Pull down and right until the landing ring appears.',
+      );
     } else {
-      showInstruction('Drag the seed backwards', 'Release to launch. Let gravity do the rest.');
+      showInstruction(
+        'Safe landing',
+        'Pull away from the next grey world, then release.',
+      );
     }
   }
 }
@@ -999,8 +1215,7 @@ function simulateSeedFixedStep() {
 }
 
 /**
- * Updates the temporary restoration visual. Day 3 replaces this with the signature wave
- * that grows terrain, trees, water and atmosphere around the spherical surface.
+ * Advances the signature spherical restoration wave, staged surface growth and atmosphere.
  *
  * @param {number} ElapsedTimeSeconds - Total elapsed game time.
  */
@@ -1013,39 +1228,88 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
       continue;
     }
 
-    const RestorationElapsedSeconds = ElapsedTimeSeconds - WorldRuntime.restorationStartedAtSeconds;
-    const RestorationProgress = WorldRuntime.restorationStartedAtSeconds === -Infinity
-      ? 1
-      : THREE.MathUtils.clamp(RestorationElapsedSeconds / 0.95, 0, 1);
-    const SmoothedRestorationProgress = 1 - Math.pow(1 - RestorationProgress, 3);
-
-    WorldRuntime.surfaceMaterial.color.copy(DeadWorldColor).lerp(
-      WorldDefinition.aliveColor,
-      SmoothedRestorationProgress,
+    const IsFullyRestoredAtStart = WorldRuntime.restorationStartedAtSeconds === -Infinity;
+    const RestorationElapsedSeconds = IsFullyRestoredAtStart
+      ? WorldDefinition.restoration.durationSeconds
+      : Math.max(0, ElapsedTimeSeconds - WorldRuntime.restorationStartedAtSeconds);
+    const LinearRestorationProgress = THREE.MathUtils.clamp(
+      RestorationElapsedSeconds / WorldDefinition.restoration.durationSeconds,
+      0,
+      1,
     );
+    const WaveProgress = calculateRestorationWaveProgress(LinearRestorationProgress);
+    const ShaderWaveProgress = LinearRestorationProgress >= 1 ? 1.2 : WaveProgress;
+    WorldRuntime.restorationUniforms.restorationProgress.value = ShaderWaveProgress;
+    WorldRuntime.restorationWaveMesh.visible = LinearRestorationProgress < 1;
+
+    const AtmosphereLinearProgress = THREE.MathUtils.clamp(
+      (LinearRestorationProgress - 0.12) / 0.76,
+      0,
+      1,
+    );
+    const AtmosphereProgress = 1 - Math.pow(1 - AtmosphereLinearProgress, 3);
     WorldRuntime.atmosphereMaterial.opacity = THREE.MathUtils.lerp(
       0.025,
-      0.12,
-      SmoothedRestorationProgress,
+      WorldDefinition.restoration.atmosphereOpacity,
+      AtmosphereProgress,
+    );
+    WorldRuntime.atmosphereMesh.scale.setScalar(
+      THREE.MathUtils.lerp(0.96, 1, AtmosphereProgress),
     );
 
     for (const MarkerMesh of WorldRuntime.surfaceMarkerGroup.children) {
+      const GrowthProgress = IsFullyRestoredAtStart
+        ? 1
+        : calculateStagedGrowthProgress(
+          WaveProgress,
+          MarkerMesh.userData.restorationDistance,
+          WorldDefinition.restoration.growthTrailWidth,
+        );
+      const GrowthScale = MarkerMesh.userData.baseScale * Math.max(0.05, GrowthProgress);
+      MarkerMesh.scale.setScalar(GrowthScale);
       MarkerMesh.material.color.copy(DarkWorldColor).lerp(
-        WorldDefinition.aliveColor.clone().offsetHSL(0, 0, 0.16),
-        SmoothedRestorationProgress,
+        WorldRuntime.aliveMarkerColor,
+        GrowthProgress,
       );
-      MarkerMesh.scale.y = Math.max(0.08, SmoothedRestorationProgress) * MarkerMesh.scale.x;
     }
 
-    if (RestorationProgress < 1) {
-      const PulseScale = 1 + (Math.sin(RestorationProgress * Math.PI) * 0.055);
+    if (LinearRestorationProgress < 1) {
+      const PulseScale = 1 + (Math.sin(LinearRestorationProgress * Math.PI) * 0.045);
       WorldRuntime.group.scale.setScalar(PulseScale);
     } else {
       WorldRuntime.group.scale.setScalar(1);
+      if (!WorldRuntime.restorationCompleted) {
+        WorldRuntime.restorationCompleted = true;
+        if (CurrentWorldIdentifier === WorldDefinition.id) {
+          showStatusToast(`${WorldDefinition.label} AWAKENED`, 850);
+          if (GamePhase === 'restoring') {
+            GamePhase = 'attached';
+            if (WorldDefinition.id === 'ember' && !getWorldDefinition('frost').restored) {
+              showInstruction(
+                'Ember is awake — aim for Frost',
+                'Pull down and right until the landing ring appears.',
+              );
+            } else {
+              showInstruction(
+                'Drag the seed backwards',
+                'Release to launch. Let gravity do the rest.',
+              );
+            }
+          }
+        }
+      }
     }
 
-    WorldRuntime.group.rotation.y += 0.0011;
-    WorldRuntime.contourRingGroup.rotation.z += 0.0007;
+    const MotionProgress = THREE.MathUtils.smoothstep(LinearRestorationProgress, 0.28, 0.92);
+    WorldRuntime.group.rotation.y += THREE.MathUtils.lerp(
+      0.0005,
+      WorldDefinition.restoration.rotationSpeed,
+      MotionProgress,
+    );
+    WorldRuntime.contourRingGroup.rotation.z += 0.0007 * MotionProgress;
+    WorldRuntime.contourRingGroup.scale.setScalar(
+      THREE.MathUtils.lerp(0.88, 1, AtmosphereProgress),
+    );
   }
 }
 
@@ -1213,20 +1477,34 @@ function resetGame() {
     WorldDefinition.restored = WorldDefinition.isStartingWorld;
     const WorldRuntime = WorldRuntimeByIdentifier.get(WorldDefinition.id);
     WorldRuntime.restorationStartedAtSeconds = WorldDefinition.isStartingWorld ? -Infinity : null;
-    WorldRuntime.surfaceMaterial.color.copy(
-      WorldDefinition.isStartingWorld ? WorldDefinition.aliveColor : DeadWorldColor,
-    );
-    WorldRuntime.atmosphereMaterial.opacity = WorldDefinition.isStartingWorld ? 0.10 : 0.025;
+    WorldRuntime.restorationCompleted = WorldDefinition.isStartingWorld;
+    WorldRuntime.restorationOriginLocal.set(1, 0, 0);
+    WorldRuntime.restorationUniforms.restorationOrigin.value.set(1, 0, 0);
+    WorldRuntime.restorationUniforms.restorationProgress.value = WorldDefinition.isStartingWorld
+      ? 1.2
+      : -0.1;
+    WorldRuntime.restorationWaveMesh.visible = false;
+    WorldRuntime.surfaceMaterial.color.set(0xffffff);
+    WorldRuntime.atmosphereMaterial.opacity = WorldDefinition.isStartingWorld
+      ? WorldDefinition.restoration.atmosphereOpacity
+      : 0.025;
+    WorldRuntime.atmosphereMesh.scale.setScalar(WorldDefinition.isStartingWorld ? 1 : 0.96);
     WorldRuntime.contourRingGroup.visible = WorldDefinition.isStartingWorld;
+    WorldRuntime.contourRingGroup.rotation.set(0, 0, 0);
+    WorldRuntime.contourRingGroup.scale.setScalar(1);
+    WorldRuntime.group.rotation.set(0, 0, 0);
     WorldRuntime.group.scale.setScalar(1);
 
     for (const MarkerMesh of WorldRuntime.surfaceMarkerGroup.children) {
       MarkerMesh.material.color.copy(
         WorldDefinition.isStartingWorld
-          ? WorldDefinition.aliveColor.clone().offsetHSL(0, 0, 0.16)
+          ? WorldRuntime.aliveMarkerColor
           : DarkWorldColor,
       );
-      MarkerMesh.scale.y = MarkerMesh.scale.x;
+      MarkerMesh.userData.restorationDistance = WorldDefinition.isStartingWorld ? 0 : 1;
+      MarkerMesh.scale.setScalar(
+        MarkerMesh.userData.baseScale * (WorldDefinition.isStartingWorld ? 1 : 0.05),
+      );
     }
   }
 
