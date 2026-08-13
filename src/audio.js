@@ -339,4 +339,15 @@ export class WorldseedAudio {
     }
     return this.isMuted;
   }
+
+  /** Suspends background audio and resumes only an already-authorized context. */
+  setPageActive(IsPageActive) {
+    if (!this.context) {
+      return;
+    }
+    const ContextOperation = IsPageActive ? this.context.resume() : this.context.suspend();
+    ContextOperation.catch(() => {
+      // Mobile lifecycle audio can settle asynchronously; the next gesture retries it.
+    });
+  }
 }
