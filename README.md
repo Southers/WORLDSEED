@@ -2,9 +2,9 @@
 
 **Bring the little worlds back to life.**
 
-WORLDSEED is a five-day Three.js game-jam project for the **Tiny Worlds** theme. It is a one-input orbital slingshot game: drag the living seed backwards, release it into the gravity wells of miniature planets, and restore every dead world you touch.
+WORLDSEED began as a focused Three.js **Tiny Worlds** prototype and is now growing into an authored planetary campaign. It is a one-input orbital slingshot game: drag the living seed backwards, release it into the gravity wells of miniature planets, choose where to land, and rebuild a connected constellation one awakening at a time.
 
-The committed jam scope is one polished journey across Meadow, Ember and Frost.
+The polished Meadow → Ember → Frost journey is the prologue and visual benchmark. The next development phase adds compact branching systems, persistent restored launch nodes, tactical Seedstones, predictable asteroids, optional route mastery and a lightweight story leading toward the Worldheart.
 
 ## Play
 
@@ -44,6 +44,8 @@ The current build includes:
 
 All three worlds now meet the authored diorama and mobile-scale silhouette bar. Ember's fast sparks and molten pulse contrast with Frost's slow glacial drift, while both reveal their luminous landmarks behind the same deterministic landing-driven restoration wave.
 
+The current playable build remains the linear First Light prologue. The next milestone is a greybox branching-system prototype that proves destination choice and landing-order strategy before additional finished worlds are produced.
+
 ### Visual budget
 
 - Keep the complete scene below roughly 180 draw calls during a restoration wave.
@@ -72,7 +74,7 @@ npm run check
 
 ## Validate the release package
 
-The local audit verifies required release files, versioned internal URLs, credits, copy, all three 1200×600 submission images and the H.264 showcase clip. The online audit additionally checks the deployed page, runtime modules, public thumbnail and public clip MIME types.
+The local audit verifies required release files, versioned internal URLs, credits, copy, all three 1200×600 showcase images and the H.264 review clip. The online audit additionally checks the deployed development page, runtime modules, public thumbnail and public clip MIME types.
 
 ```bash
 npm run release:check
@@ -86,14 +88,14 @@ npm run release:online
 - `M` toggles all audio.
 - The Reset button provides the same action on touch devices.
 
-## Jam constraint
+## Development boundary
 
-This project is built from scratch for the August 2026 Three.js Tiny Worlds game jam. The deadline is **19 August 2026 at 00:00 UTC**.
+WORLDSEED must not be submitted to a jam, competition, gallery, store, form or other external entry surface without a separate explicit future instruction from the user. Updating the existing public development build for approved playtesting is not permission to submit or announce the game.
 
 ## Project guide
 
 - `AGENTS.md` defines the implementation objective, priorities and quality gates.
 - `DESIGN.md` defines the player promise, core loop and scope.
-- `JAM_PLAN.md` defines the five-day execution and cut plan.
+- `JAM_PLAN.md` defines the campaign milestones, validation gates and cut order.
 - `CREDITS.md` tracks every external dependency and asset.
-- `SUBMISSION.md` contains paste-ready jam copy, links, screenshot mapping and the final submission checklist.
+- `SUBMISSION.md` is an archived reference package and must not be acted on without a separate explicit instruction.

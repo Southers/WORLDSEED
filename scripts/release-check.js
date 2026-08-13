@@ -134,7 +134,8 @@ async function verifyLocalRelease() {
   requireText(SubmissionMarkdown, 'https://github.com/Southers/WORLDSEED', 'SUBMISSION.md');
   requireText(SubmissionMarkdown, 'Theme: Tiny Worlds', 'SUBMISSION.md');
   requireText(SubmissionMarkdown, 'submission/worldseed-showcase.mp4', 'SUBMISSION.md');
-  requireText(SubmissionMarkdown, 'Published submission URL: _pending_', 'SUBMISSION.md');
+  requireText(SubmissionMarkdown, 'DO NOT SUBMIT OR PUBLISH THIS MATERIAL.', 'SUBMISSION.md');
+  requireText(SubmissionMarkdown, 'External publication status: **prohibited**', 'SUBMISSION.md');
 
   const CreditsMarkdown = TextByPath.get('CREDITS.md');
   requireText(CreditsMarkdown, 'Three.js', 'CREDITS.md');

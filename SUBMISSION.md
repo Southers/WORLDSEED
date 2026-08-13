@@ -1,7 +1,6 @@
-# WORLDSEED Submission Package
+# WORLDSEED Archived Submission Reference
 
-Deadline: **19 August 2026 at 00:00 UTC**  
-Internal submission target: **18 August 2026 at 23:00 UTC**
+> **DO NOT SUBMIT OR PUBLISH THIS MATERIAL.** It is retained only as a historical reference and capture archive. No jam entry, form, gallery listing, store page, announcement or other external publication is authorised without a separate explicit future instruction from the user.
 
 ## Links
 
@@ -21,7 +20,7 @@ Slingshot a living seed through the gravity wells of three tiny planets and awak
 
 WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, and land on Meadow, Ember and Frost to send life racing around each tiny planet.
 
-## Full submission description
+## Archived long-form description
 
 ### Bring the little worlds back to life
 
@@ -57,25 +56,18 @@ The tiny worlds are both the subject and the mechanic. Their curved surfaces cre
 
 ## Screenshot set
 
-1. `submission/thumbnail.png` — 1200×600 Ember awakening hero image and submission thumbnail.
+1. `submission/thumbnail.png` — 1200×600 Ember awakening hero image and showcase thumbnail.
 2. `submission/opening.png` — 1200×600 opening composition showing all three worlds and the seed.
 3. `submission/victory.png` — 1200×600 final restored system and victory payoff.
 
 ## Showcase clip
 
-`submission/worldseed-showcase.mp4` is a silent 10.5-second, 1200×600 H.264 progression from the dormant opening through Ember's awakening to the restored-system victory. It is assembled only from the authentic submission captures and is ready for upload where the entry page or social post accepts video.
+`submission/worldseed-showcase.mp4` is a silent 10.5-second, 1200×600 H.264 progression from the dormant opening through Ember's awakening to the restored-system victory. It is assembled only from authentic game captures and retained for internal review.
 
-## Final form checklist
+## External-action safeguard
 
-- [ ] Confirm the official 2026 form fields and rules when the event page becomes available.
-- [ ] Use the exact title, public play URL and source URL above.
-- [ ] Upload `submission/thumbnail.png` without further scaling if the expected size is 1200×600.
-- [ ] Upload `submission/worldseed-showcase.mp4` where an optional gameplay/showcase clip is accepted.
-- [ ] Paste the full description or the short description if a character limit applies.
-- [ ] Confirm the public URL works in a clean browser with no login.
-- [ ] Run `npm run release:online` and retain the passing output with the final regression notes.
-- [ ] Confirm the source repository is public and `CREDITS.md` is current.
-- [ ] Submit by 18 August 2026 at 23:00 UTC, preserving one hour of contingency.
-- [ ] Record the published submission URL below.
+- The public link exists for development playtesting only.
+- These images, copy and video must not be uploaded to an external entry surface.
+- A future submission requires a new, explicit user instruction; the development goal never implies permission.
 
-Published submission URL: _pending_
+External publication status: **prohibited**

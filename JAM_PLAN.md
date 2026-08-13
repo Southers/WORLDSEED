@@ -1,50 +1,92 @@
-# WORLDSEED Five-Day Jam Plan
+# WORLDSEED Campaign Development Plan
 
-Deadline: **19 August 2026, 00:00 UTC**. Feature freeze: **18 August, 12:00 UTC**.
+This roadmap replaces the former five-day submission plan. It has no submission milestone or automatic deadline action.
 
-## Day 1 — 14 August: playable in public
+> External submission is explicitly prohibited unless the user gives a separate future instruction.
 
-- Put the current checkpoint on a stable public URL.
-- Perform the first real desktop and mobile browser playtests.
-- Tune the opening shot, aim readability, launch feel, camera and recovery timing.
-- Establish a repeatable release smoke test.
+## Milestone 0 — Campaign foundation
 
-Exit: a stranger can open the link, understand the gesture and complete the greybox journey.
+- Lock the campaign premise, system loop and route-choice vocabulary.
+- Treat Meadow → Ember → Frost as the polished prologue.
+- Preserve deterministic shared physics, one-input controls, fast recovery and the restoration spectacle.
+- Remove submission activity from the working objective and documentation.
 
-## Day 2 — 15 August: the awakening
+Exit: the repository describes one coherent larger game and no active plan asks an agent to submit it.
 
-- Build the reusable planet-wrapping restoration system.
-- Sequence impact, colour propagation, growth, atmosphere and motion.
-- Keep the effect performant and configurable per world.
+## Milestone 1 — Branching-system prototype
 
-Exit: awakening a placeholder world is the most memorable moment in the build.
+- Add two greybox destinations to a development version of the current system.
+- Allow the trajectory outcome, rather than a scripted sequence, to select any valid target.
+- Keep restored worlds available as persistent launch nodes.
+- Make landing order change the next set of useful shots.
+- Provide at least one safe route and one harder but strategically valuable route.
 
-## Day 3 — 16 August: Meadow vertical slice
+Exit: a playtester can make a meaningful destination choice and explain it.
 
-- Bring Meadow to final art, lighting, animation, sound and UI quality.
-- Lock the visual grammar and performance budget for all worlds.
-- Capture a representative screenshot and short clip for quality review.
+## Milestone 2 — Tactical small bodies
 
-Exit: Meadow is submission-quality and defines a repeatable bar.
+- Add one clearly identified Seedstone as a temporary launchpad.
+- Add one deterministic orbiting asteroid with a legible trajectory.
+- Represent future asteroid collisions in the same trusted prediction system.
+- Add a small optional stardust route that rewards an expressive gravity assist.
 
-## Day 4 — 17 August: complete the journey
+Exit: asteroids introduce planning and timing without surprise failure or visual clutter.
 
-- Bring Ember and Frost to the Meadow quality bar.
-- Add music progression, world-specific sound and gameplay juice.
-- Tune the full sequence of shots and completion payoff.
+## Milestone 3 — System objective and meta loop
 
-Exit: the complete three-world experience feels cohesive from title to victory.
+- Add a compact life/Worldheart progress display.
+- Open the system exit after an authored restoration threshold.
+- Track the Heart, Bloom and Arc mastery emblems.
+- Add a system-completion transition and a simple constellation overview.
+- Decide whether campaign progress needs local persistence only after the loop is proven.
 
-## Day 5 — 18 August: freeze and polish
+Exit: the player understands the immediate shot, the current system objective and the campaign purpose.
 
-- Freeze features at 12:00 UTC.
-- Profile and optimise desktop/mobile rendering and input.
-- Test loading, resize/orientation, backgrounding, reset, recovery and victory paths.
-- Prepare final build, credits, screenshots, short description and submission post.
-- Submit before 23:00 UTC, retaining one hour of contingency.
+## Milestone 4 — Story and feedback
 
-Exit: public link verified from a clean browser, submission posted and all required credits present.
+- Add one-line awakening memories without blocking control.
+- Add route-opening, near-miss, gravity-assist and mastery feedback.
+- Tell each system's miniature story through restored landmarks and motion.
+- Ensure UI copy remains concise and readable on a narrow phone.
 
-## Cut order if time slips
+Exit: the player can describe what the seed is doing and why the journey matters.
 
-Cut optional props first, then per-world secondary animation, then nonessential audio layers. Never cut control clarity, deterministic prediction, the restoration wave, fast recovery, mobile reliability or the final submission pass.
+## Milestone 5 — The Broken Belt vertical slice
+
+- Replace greybox destinations with five to seven authored worlds, moons and Seedstones.
+- Give every destination a clear silhouette, route purpose and restoration identity.
+- Tune multiple viable completion routes.
+- Bring lighting, audio, restoration, camera work and mobile performance to the current prologue's quality bar.
+
+Exit: one complete branching system feels like a real game chapter rather than an expanded demo.
+
+## Milestone 6 — Authored campaign
+
+- Build the Wandering Garden and Long Night systems using the proven content pipeline.
+- Escalate spatial problems without stacking unrelated mechanics.
+- Keep optional mastery routes separate from basic completion.
+- Use short story fragments and constellation progress to connect the systems.
+
+Exit: the campaign sustains choice, mastery and emotional progression across multiple systems.
+
+## Milestone 7 — Worldheart finale and polish
+
+- Build a final system that recombines the established route vocabulary.
+- Deliver the largest restoration payoff without breaking the visual grammar.
+- Profile desktop and mobile performance across the complete campaign.
+- Test loading, resize/orientation, backgrounding, recovery, reset and completion paths.
+- Finish accessibility, credits, documentation and the public development build.
+
+Exit: WORLDSEED is a polished, reliable game ready for the user to decide what happens next. It is not submitted anywhere.
+
+## Validation gate for every milestone
+
+1. Run `npm test` and `npm run check`.
+2. Play the affected journey at desktop and portrait-mobile aspect ratios.
+3. Verify deterministic prediction, launch, landing, failure recovery and reset.
+4. Verify every newly introduced decision has distinct, understandable outcomes.
+5. Record browser evidence and keep `main` playable.
+
+## Cut order
+
+If scope becomes too large, cut optional stardust layouts first, then secondary story fragments, then secondary worlds within a system. Never cut control clarity, deterministic prediction, meaningful route choice, fast recovery, the restoration wave, mobile reliability or the Worldheart through-line.
