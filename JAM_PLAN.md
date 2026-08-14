@@ -110,7 +110,16 @@ for browser evidence. All five chapters loaded at 1280×720 and 390×844 within 
 preserved Confluence through rotation to 844×390; and a real portrait drag proved miss recovery,
 Meadow-to-Ember landing, pointer focus and Reset with a clean console. The background visibility
 transition remains on the manual release checklist because the browser test surface did not mark
-its controlled tab hidden. Final screenshots, showcase media and the public release gate remain.
+its controlled tab hidden.
+
+Media checkpoint: the obsolete three-world imagery has been replaced with three 1200×600 captures
+from a completed deployed-build Worldheart playthrough: the branching opening, the route-pulse hero
+and the final constellation. The silent 10.5-second H.264 review clip now progresses through
+Starwell, the physical route unlock, the restoration pulse and the campaign resolution using only
+authentic captured frames. Local signature, dimension, duration, codec and package audits pass.
+The live organizer post confirms the deadline, rules, five judging categories and exact reply-based
+entry route; the required playable link and Tiny Worlds explanation are prepared. The public media
+deploy and final release audit remain. Publishing the reply stays user-controlled.
 
 ## Validation gate for every milestone
 
