@@ -33,6 +33,7 @@ Drag the glowing seed backwards and release it into the gravity wells of a conne
 - **A trustworthy gravity toy:** prediction and live flight share one deterministic simulation.
 - **Readable tactical routes:** one-use Seedstones create new launch geometry, while orbiting asteroids turn future collisions red before release.
 - **Optional mastery:** a three-mote Arc rewards an expressive Meadow-to-Frost curve, with predicted pickups highlighted before release and tracked for the run.
+- **A clear objective:** restore three worlds to expose a physical Worldheart exit, or keep routing to earn the optional Bloom and Arc emblems before leaving.
 - **Immediate recovery:** failed shots return the seed quickly, preserving experimentation.
 - **An authored transformation:** every landing awakens colour, landmarks, ambience and another layer of the procedural score.
 - **Desktop and mobile ready:** responsive framing, touch controls, adaptive pixel density and a mute control.

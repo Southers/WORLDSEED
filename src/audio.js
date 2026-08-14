@@ -313,6 +313,19 @@ export class WorldseedAudio {
     }
   }
 
+  worldheartOpen() {
+    [329.63, 440, 554.37].forEach((Frequency, NoteIndex) => {
+      this.playTone({
+        frequency: Frequency,
+        endFrequency: Frequency * 1.04,
+        duration: 0.62,
+        volume: 0.055,
+        type: NoteIndex === 1 ? 'triangle' : 'sine',
+        delay: NoteIndex * 0.11,
+      });
+    });
+  }
+
   failure() {
     this.endAim();
     this.endFlight();

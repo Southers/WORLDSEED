@@ -1,14 +1,16 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260813-7b';
+import { WorldseedAudio } from './audio.js?v=20260813-7c';
 
 import {
   countRestoredWorlds,
   getRestorableWorlds,
   getRouteChoices,
+  getSystemEmblems,
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
-} from './campaign.js?v=20260813-7b';
+  isWorldheartUnlocked,
+} from './campaign.js?v=20260813-7c';
 
 import {
   calculateBodyPositionAtTime,
@@ -18,12 +20,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260813-7b';
+} from './physics.js?v=20260813-7c';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260813-7b';
+} from './restoration.js?v=20260813-7c';
 
 /**
  * WORLDSEED — First Light branching-system prototype.
@@ -37,6 +39,9 @@ import {
 const GameCanvas = document.querySelector('#GameCanvas');
 const WorldCounterElement = document.querySelector('#WorldCounter');
 const StardustCounterElement = document.querySelector('#StardustCounter');
+const ObjectivePanelElement = document.querySelector('#ObjectivePanel');
+const ObjectiveStateElement = document.querySelector('#ObjectiveState');
+const ObjectivePipElements = [...document.querySelectorAll('.objective-panel__pips span')];
 const InstructionPanelElement = document.querySelector('#InstructionPanel');
 const InstructionTitleElement = document.querySelector('#InstructionTitle');
 const InstructionBodyElement = document.querySelector('#InstructionBody');
@@ -48,10 +53,14 @@ const StatusToastElement = document.querySelector('#StatusToast');
 const RouteLabelElements = [...document.querySelectorAll('.route-label')];
 const TacticalLabelElements = [...document.querySelectorAll('.tactical-label')];
 const VictoryPanelElement = document.querySelector('#VictoryPanel');
+const VictoryTitleElement = document.querySelector('#VictoryTitle');
+const VictoryBodyElement = document.querySelector('#VictoryBody');
+const EmblemElements = [...document.querySelectorAll('[data-emblem]')];
+const ConstellationNodeElements = [...document.querySelectorAll('[data-world-id]')];
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260813-7b';
+GameCanvas.dataset.build = '20260813-7c';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -64,6 +73,7 @@ const MaximumTrajectoryPredictionSteps = 520;
 const OutOfBoundsDistance = 34;
 const StartingWorldIdentifier = 'meadow';
 const MaximumDrawCallBudget = 180;
+const WorldheartUnlockThreshold = 3;
 const StardustPickupRadius = 0.22;
 const StardustCollectionRadius = SeedRadius + StardustPickupRadius;
 const MinimumAdaptivePixelRatio = 1;
@@ -122,12 +132,14 @@ let LastSafeSeedPosition = createVector();
 let LastSafeWorldIdentifier = StartingWorldIdentifier;
 let RecoveryTimeoutIdentifier = null;
 let StatusToastTimeoutIdentifier = null;
+let WorldheartCompletionTimeoutIdentifier = null;
 let HasLaunchedOnce = false;
 let LaunchPulseLifeSeconds = 0;
 let ImpactPulseLifeSeconds = 0;
 let CameraImpactLifeSeconds = 0;
 let SeedstoneUsesRemaining = 1;
 let SeedstoneCrumbleStartedAtSeconds = null;
+let WorldheartJustUnlocked = false;
 let PredictedStardustIdentifiers = new Set();
 let SeedPhysicsState = {
   position: createVector(),
@@ -268,8 +280,27 @@ const AsteroidDefinition = {
     angularSpeedRadiansPerSecond: 0.34,
   },
 };
-const TacticalBodyDefinitions = [SeedstoneDefinition, AsteroidDefinition];
-const CampaignNodeDefinitions = [...WorldDefinitions, SeedstoneDefinition];
+const WorldheartDefinition = {
+  id: 'worldheart',
+  label: 'WORLDHEART',
+  kind: 'worldheart',
+  position: createVector(-4.35, 8.75, 0),
+  radius: 0.9,
+  restored: false,
+  countsTowardRestoration: false,
+  isRouteDestination: true,
+  routeAvailable: false,
+};
+const TacticalBodyDefinitions = [
+  SeedstoneDefinition,
+  AsteroidDefinition,
+  WorldheartDefinition,
+];
+const CampaignNodeDefinitions = [
+  ...WorldDefinitions,
+  SeedstoneDefinition,
+  WorldheartDefinition,
+];
 const StardustDefinitions = [
   { id: 'first-light-arc-1', position: createVector(-1.56, -2.72, 0), collected: false },
   { id: 'first-light-arc-2', position: createVector(-1.20, -0.45, 0), collected: false },
@@ -1460,6 +1491,7 @@ TacticalBodyMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 TacticalBodyMesh.frustumCulled = false;
 TacticalBodyMesh.setColorAt(0, new THREE.Color(0x72d9ff));
 TacticalBodyMesh.setColorAt(1, new THREE.Color(0xc88761));
+TacticalBodyMesh.setColorAt(2, new THREE.Color(0xffd678));
 TacticalBodyMesh.instanceColor.needsUpdate = true;
 Scene.add(TacticalBodyMesh);
 
@@ -1495,6 +1527,8 @@ const StardustMaterial = new THREE.MeshBasicMaterial({
 });
 const StardustBaseColor = new THREE.Color(0x82dfff);
 const StardustPredictedColor = new THREE.Color(0xffef9b);
+const WorldheartLockedColor = new THREE.Color(0x444d4b);
+const WorldheartOpenColor = new THREE.Color(0xffd678);
 const StardustMesh = new THREE.InstancedMesh(
   StardustGeometry,
   StardustMaterial,
@@ -1720,15 +1754,29 @@ function getWorldDefinition(WorldIdentifier) {
 /** Returns the collision bodies that are active at the current campaign state. */
 function getActiveTacticalBodyDefinitions() {
   return TacticalBodyDefinitions.filter((BodyDefinition) => (
-    BodyDefinition.kind === 'hazard' || SeedstoneUsesRemaining > 0
+    BodyDefinition.kind === 'hazard'
+    || (BodyDefinition.kind === 'seedstone' && SeedstoneUsesRemaining > 0)
+    || (BodyDefinition.kind === 'worldheart' && WorldheartDefinition.routeAvailable)
   ));
 }
 
 /** Reveals the nearest useful routes while leaving every physical destination valid. */
 function showRouteChoiceInstruction() {
   const RouteChoices = getRouteChoices(CampaignNodeDefinitions, CurrentWorldIdentifier, 2);
+  const HasWorldheartChoice = RouteChoices.some(
+    (RouteChoice) => RouteChoice.id === WorldheartDefinition.id,
+  );
+  if (HasWorldheartChoice) {
+    showInstruction(
+      'The WORLDHEART route is open',
+      isSystemRestored(WorldDefinitions)
+        ? 'Every world is awake. Carry the seed into the golden heart.'
+        : 'Leave now for Heart, or awaken the final world to earn Bloom.',
+    );
+    return;
+  }
   if (RouteChoices.length === 0) {
-    showInstruction('The First Light network is awake', 'The path to the Worldheart is opening.');
+    showInstruction('The First Light network is awake', 'Find the golden Worldheart route.');
     return;
   }
 
@@ -1850,7 +1898,31 @@ function updateTacticalBodies(ElapsedTimeSeconds) {
   TacticalBodyTransform.scale.setScalar(AsteroidDefinition.radius / SeedstoneDefinition.radius);
   TacticalBodyTransform.updateMatrix();
   TacticalBodyMesh.setMatrixAt(1, TacticalBodyTransform.matrix);
+
+  const WorldheartPulseScale = WorldheartDefinition.routeAvailable
+    ? 1 + (Math.sin(ElapsedTimeSeconds * 3.2) * 0.1)
+    : 0.36 + (Math.sin(ElapsedTimeSeconds * 1.4) * 0.018);
+  TacticalBodyTransform.position.set(
+    WorldheartDefinition.position.x,
+    WorldheartDefinition.position.y,
+    0.1,
+  );
+  TacticalBodyTransform.rotation.set(
+    ElapsedTimeSeconds * 0.42,
+    ElapsedTimeSeconds * 0.58,
+    ElapsedTimeSeconds * 0.35,
+  );
+  TacticalBodyTransform.scale.setScalar(
+    (WorldheartDefinition.radius / SeedstoneDefinition.radius) * WorldheartPulseScale,
+  );
+  TacticalBodyTransform.updateMatrix();
+  TacticalBodyMesh.setMatrixAt(2, TacticalBodyTransform.matrix);
+  TacticalBodyMesh.setColorAt(
+    2,
+    WorldheartDefinition.routeAvailable ? WorldheartOpenColor : WorldheartLockedColor,
+  );
   TacticalBodyMesh.instanceMatrix.needsUpdate = true;
+  TacticalBodyMesh.instanceColor.needsUpdate = true;
   TacticalBodyMesh.visible = ShouldShowTacticalLayer;
   AsteroidOrbitLine.visible = ShouldShowTacticalLayer;
   AsteroidOrbitMaterial.opacity = 0.14 + (Math.sin(ElapsedTimeSeconds * 1.8) * 0.035);
@@ -1860,6 +1932,7 @@ function updateTacticalBodies(ElapsedTimeSeconds) {
       ? { definition: SeedstoneDefinition, position: SeedstoneDefinition.position, text: 'SEEDSTONE · 1 USE' }
       : null,
     { definition: AsteroidDefinition, position: AsteroidPosition, text: 'ASTEROID · MOVING' },
+    null,
   ];
   for (let LabelIndex = 0; LabelIndex < TacticalLabelElements.length; LabelIndex += 1) {
     const TacticalLabelElement = TacticalLabelElements[LabelIndex];
@@ -1907,6 +1980,58 @@ function updateStardustCounter() {
     'is-complete',
     CollectedStardustCount === StardustDefinitions.length,
   );
+}
+
+/** Keeps the campaign objective visible without crowding the world/mastery counter. */
+function updateWorldheartObjective() {
+  const RestoredWorldCount = countRestoredWorlds(WorldDefinitions);
+  const IsWorldheartOpen = WorldheartDefinition.routeAvailable;
+  ObjectivePanelElement.classList.toggle('is-open', IsWorldheartOpen);
+  ObjectiveStateElement.textContent = WorldheartDefinition.restored
+    ? 'RECONNECTED'
+    : IsWorldheartOpen
+      ? 'ROUTE OPEN'
+    : `${Math.min(RestoredWorldCount, WorldheartUnlockThreshold)} / ${WorldheartUnlockThreshold}`;
+  for (let PipIndex = 0; PipIndex < ObjectivePipElements.length; PipIndex += 1) {
+    ObjectivePipElements[PipIndex].classList.toggle(
+      'is-filled',
+      PipIndex < RestoredWorldCount,
+    );
+  }
+}
+
+/** Populates the non-blocking completion summary from the actual run state. */
+function updateVictorySummary() {
+  const CollectedStardustCount = StardustDefinitions.filter(
+    (StardustDefinition) => StardustDefinition.collected,
+  ).length;
+  const Emblems = getSystemEmblems(
+    WorldDefinitions,
+    CollectedStardustCount,
+    StardustDefinitions.length,
+    true,
+  );
+  const EarnedEmblemCount = Object.values(Emblems).filter(Boolean).length;
+
+  VictoryTitleElement.textContent = EarnedEmblemCount === 3
+    ? 'First Light blooms perfectly.'
+    : 'The Worldheart hears you.';
+  VictoryBodyElement.textContent = EarnedEmblemCount === 3
+    ? 'Every world and every arc now shines in the living constellation.'
+    : 'A living path reaches onward. Return for the dim emblems whenever you like.';
+
+  for (const EmblemElement of EmblemElements) {
+    const IsEarned = Emblems[EmblemElement.dataset.emblem] === true;
+    EmblemElement.classList.toggle('is-earned', IsEarned);
+    EmblemElement.setAttribute('aria-label', `${EmblemElement.dataset.emblem} ${IsEarned ? 'earned' : 'not earned'}`);
+  }
+
+  for (const ConstellationNodeElement of ConstellationNodeElements) {
+    const WorldIdentifier = ConstellationNodeElement.dataset.worldId;
+    const IsAwake = WorldIdentifier === WorldheartDefinition.id
+      || getWorldDefinition(WorldIdentifier)?.restored === true;
+    ConstellationNodeElement.classList.toggle('is-awake', IsAwake);
+  }
 }
 
 /** Collects any optional stardust touched by the live fixed-step seed position. */
@@ -2107,13 +2232,16 @@ function restoreWorld(WorldDefinition, ImpactPosition) {
 
   updateWorldCounter();
   const RestoredWorldCount = countRestoredWorlds(WorldDefinitions);
+  if (
+    !WorldheartDefinition.routeAvailable
+    && isWorldheartUnlocked(WorldDefinitions, WorldheartUnlockThreshold)
+  ) {
+    WorldheartDefinition.routeAvailable = true;
+    WorldheartJustUnlocked = true;
+  }
+  updateWorldheartObjective();
   WorldseedSound.restore(WorldDefinition.id, RestoredWorldCount);
   showStatusToast(`${WorldDefinition.label} AWAKENING`, 1450);
-
-  if (isSystemRestored(WorldDefinitions)) {
-    GamePhase = 'victoryPending';
-    hideInstruction();
-  }
 }
 
 /**
@@ -2189,6 +2317,39 @@ function attachSeedToSeedstone(ImpactPosition) {
     'Temporary launchpad',
     'Choose the next world carefully — the Seedstone crumbles after launch.',
   );
+}
+
+/** Completes the system only when the player physically carries the seed into the exit. */
+function attachSeedToWorldheart(ImpactPosition) {
+  if (!WorldheartDefinition.routeAvailable || WorldheartDefinition.restored) {
+    return;
+  }
+
+  const SurfaceRestPosition = calculateSurfaceRestPosition(WorldheartDefinition, ImpactPosition);
+  ImpactPulseMesh.material.color.set(0xffd678);
+  ImpactPulseMesh.position.set(ImpactPosition.x, ImpactPosition.y, 0.24);
+  ImpactPulseMesh.scale.setScalar(1.2);
+  ImpactPulseMesh.visible = true;
+  ImpactPulseLifeSeconds = 0.58;
+  CameraImpactLifeSeconds = 0.24;
+  WorldseedSound.impact('worldheart');
+
+  SeedPhysicsState = { position: SurfaceRestPosition, velocity: createVector() };
+  SeedGroup.position.set(SurfaceRestPosition.x, SurfaceRestPosition.y, SurfaceRestPosition.z);
+  CurrentWorldIdentifier = WorldheartDefinition.id;
+  WorldheartDefinition.restored = true;
+  GamePhase = 'victoryPending';
+  updateWorldheartObjective();
+  updateVictorySummary();
+  hideInstruction();
+  showStatusToast('WORLDHEART RECONNECTED', 1100);
+
+  WorldheartCompletionTimeoutIdentifier = window.setTimeout(() => {
+    VictoryPanelElement.hidden = false;
+    GamePhase = 'victory';
+    WorldseedSound.victory();
+    WorldheartCompletionTimeoutIdentifier = null;
+  }, 850);
 }
 
 /**
@@ -2368,6 +2529,31 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     LandingMarkerMesh.position.set(
       SeedstonePosition.x + (LandingDirection.x * (SeedstoneDefinition.radius + 0.08)),
       SeedstonePosition.y + (LandingDirection.y * (SeedstoneDefinition.radius + 0.08)),
+      0.2,
+    );
+    LandingMarkerMesh.visible = true;
+  } else if (TrajectoryPrediction.collisionKind === 'worldheart') {
+    TrajectoryMaterial.color.set(0xffd678);
+    TrajectoryMaterial.opacity = 0.9;
+    LandingMarkerMaterial.color.set(0xffd678);
+    AimPanelElement.classList.add('is-locked');
+    AimLabelElement.textContent = 'WORLDHEART LOCKED';
+    showInstruction(
+      'Release to reconnect the Worldheart',
+      isSystemRestored(WorldDefinitions)
+        ? 'Heart, Bloom and Arc will record the journey you completed.'
+        : 'You can leave now, or awaken every world first to earn Bloom.',
+    );
+    const LandingDirection = TemporaryThreeVector.set(
+      FinalPredictionPoint.x - WorldheartDefinition.position.x,
+      FinalPredictionPoint.y - WorldheartDefinition.position.y,
+      0,
+    ).normalize();
+    LandingMarkerMesh.position.set(
+      WorldheartDefinition.position.x
+        + (LandingDirection.x * (WorldheartDefinition.radius + 0.08)),
+      WorldheartDefinition.position.y
+        + (LandingDirection.y * (WorldheartDefinition.radius + 0.08)),
       0.2,
     );
     LandingMarkerMesh.visible = true;
@@ -2644,6 +2830,11 @@ function simulateSeedFixedStep() {
     return;
   }
 
+  if (CollisionBody?.definition.kind === 'worldheart') {
+    attachSeedToWorldheart(SeedPhysicsState.position);
+    return;
+  }
+
   if (CollisionWorldDefinition) {
     attachSeedToWorld(CollisionWorldDefinition, SeedPhysicsState.position);
     return;
@@ -2723,7 +2914,13 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
         WorldRuntime.restorationCompleted = true;
         WorldseedSound.restorationComplete(WorldDefinition.id);
         if (CurrentWorldIdentifier === WorldDefinition.id) {
-          showStatusToast(`${WorldDefinition.label} AWAKENED`, 850);
+          if (WorldheartJustUnlocked) {
+            WorldheartJustUnlocked = false;
+            WorldseedSound.worldheartOpen();
+            showStatusToast('WORLDHEART ROUTE OPEN', 1400);
+          } else {
+            showStatusToast(`${WorldDefinition.label} AWAKENED`, 850);
+          }
           if (GamePhase === 'victoryPending') {
             VictoryPanelElement.hidden = false;
             GamePhase = 'victory';
@@ -3024,6 +3221,10 @@ function resetGame() {
     window.clearTimeout(StatusToastTimeoutIdentifier);
     StatusToastTimeoutIdentifier = null;
   }
+  if (WorldheartCompletionTimeoutIdentifier !== null) {
+    window.clearTimeout(WorldheartCompletionTimeoutIdentifier);
+    WorldheartCompletionTimeoutIdentifier = null;
+  }
 
   IsPointerAiming = false;
   ActivePointerIdentifier = null;
@@ -3119,6 +3320,9 @@ function resetGame() {
   LaunchIgnoredBodyIdentifier = null;
   SeedstoneUsesRemaining = 1;
   SeedstoneCrumbleStartedAtSeconds = null;
+  WorldheartDefinition.routeAvailable = false;
+  WorldheartDefinition.restored = false;
+  WorldheartJustUnlocked = false;
   for (const StardustDefinition of StardustDefinitions) {
     StardustDefinition.collected = false;
   }
@@ -3149,6 +3353,7 @@ function resetGame() {
 
   updateWorldCounter();
   updateStardustCounter();
+  updateWorldheartObjective();
   updateTargetBeacons(0);
   const OpeningRouteChoices = getRouteChoices(
     CampaignNodeDefinitions,
