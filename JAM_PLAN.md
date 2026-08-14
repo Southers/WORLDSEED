@@ -102,6 +102,16 @@ Exit: WORLDSEED is a polished, reliable, submission-ready game. Stop before the 
 
 Finale checkpoint: the campaign now advances from Long Night into a six-world Worldheart chapter—Confluence, Kindle, Memory, Starwell, Dawn and Chorus. It recombines the proven safe/long opening, orbiting one-use launch node, deterministic timing hazard, heavy gravity well and banked three-mote Arc before a four-world physical core gate. Once unlocked, the core becomes the first authored suggestion from every launch node. Landing there triggers a 3.4-second pooled system restoration—route lines, expanding rings, deterministic sparks and an environment bloom—before the final constellation summary. Fifty-two deterministic tests cover the finale contract, both openings, Last Shadow timing, full Arc, moving Memory Moon prediction/live agreement and core prediction/live agreement. Desktop and 390×844 completed Confluence → Kindle → Dawn → Starwell → Memory → Worldheart; mobile also verified corrected exit guidance and Replay reset. The runs peaked at 23 / 22 draw calls with clean consoles. Campaign-wide profiling, lifecycle/accessibility checks and final media remain before milestone exit.
 
+Hardening checkpoint: the interface now separates polite route announcements from the rapid aim
+meter, exposes canvas instructions and keyboard shortcuts, moves focus into and back out of the
+completion dialog, guarantees visible focus and 44px touch targets, and honors reduced motion in
+both CSS and the Three.js presentation path. Viewport/orientation and lifecycle state are published
+for browser evidence. All five chapters loaded at 1280×720 and 390×844 within budget; Worldheart
+preserved Confluence through rotation to 844×390; and a real portrait drag proved miss recovery,
+Meadow-to-Ember landing, pointer focus and Reset with a clean console. The background visibility
+transition remains on the manual release checklist because the browser test surface did not mark
+its controlled tab hidden. Final screenshots, showcase media and the public release gate remain.
+
 ## Validation gate for every milestone
 
 1. Run `npm test` and `npm run check`.

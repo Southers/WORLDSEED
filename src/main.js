@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7r';
+import { WorldseedAudio } from './audio.js?v=20260814-7s';
 
 import {
   DefaultAuthoredSystemIdentifier,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
   getNextAuthoredSystemIdentifier,
-} from './content.js?v=20260814-7r';
+} from './content.js?v=20260814-7s';
 
 import {
   countRestoredWorlds,
@@ -19,7 +19,7 @@ import {
   isSystemRestored,
   isWorldheartUnlocked,
   rollbackFlightPickups,
-} from './campaign.js?v=20260814-7r';
+} from './campaign.js?v=20260814-7s';
 
 import {
   calculateBodyPositionAtTime,
@@ -29,12 +29,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7r';
+} from './physics.js?v=20260814-7s';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7r';
+} from './restoration.js?v=20260814-7s';
 
 const RequestedSystemIdentifier = new URLSearchParams(window.location.search).get('system')
   ?? DefaultAuthoredSystemIdentifier;
@@ -102,8 +102,10 @@ const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
 configureSystemInterface();
-GameCanvas.dataset.build = '20260814-7r';
+GameCanvas.dataset.build = '20260814-7s';
 GameCanvas.dataset.system = ActiveSystem.id;
+GameCanvas.dataset.pageActive = String(!document.hidden);
+GameCanvas.dataset.webglAvailable = 'true';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -123,6 +125,9 @@ const StardustCollectionRadius = SeedRadius + StardustPickupRadius;
 const MinimumAdaptivePixelRatio = 1;
 const WorldClosePassClearance = 1.35;
 const AsteroidClosePassClearance = 1.05;
+const ReducedMotionMediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+let PrefersReducedMotion = ReducedMotionMediaQuery.matches;
+GameCanvas.dataset.reducedMotion = String(PrefersReducedMotion);
 
 const Scene = new THREE.Scene();
 Scene.background = ActiveSystem.environment.backgroundColor;
@@ -3391,6 +3396,12 @@ function attachSeedToSeedstone(ImpactPosition, BodyPosition) {
   );
 }
 
+/** Reveals the modal completion summary and moves keyboard focus into it. */
+function revealVictoryPanel() {
+  VictoryPanelElement.hidden = false;
+  PlayAgainButtonElement.focus({ preventScroll: true });
+}
+
 /** Completes the system only when the player physically carries the seed into the exit. */
 function attachSeedToWorldheart(ImpactPosition) {
   if (!WorldheartDefinition.routeAvailable || WorldheartDefinition.restored) {
@@ -3426,12 +3437,15 @@ function attachSeedToWorldheart(ImpactPosition) {
     showStatusToast(`${WorldheartDefinition.label} RECONNECTED`, 1100);
   }
 
+  const VictoryDelaySeconds = PrefersReducedMotion
+    ? 0.85
+    : ActiveSystem.finale?.victoryDelaySeconds ?? 0.85;
   WorldheartCompletionTimeoutIdentifier = window.setTimeout(() => {
-    VictoryPanelElement.hidden = false;
+    revealVictoryPanel();
     GamePhase = 'victory';
     WorldseedSound.victory();
     WorldheartCompletionTimeoutIdentifier = null;
-  }, (ActiveSystem.finale?.victoryDelaySeconds ?? 0.85) * 1000);
+  }, VictoryDelaySeconds * 1000);
 }
 
 /** Starts the final system-scale pulse only after the seed physically lands in the core. */
@@ -3457,10 +3471,12 @@ function updateFinaleRestorationVisuals(ElapsedTimeSeconds) {
   }
 
   const FinaleDurationSeconds = ActiveSystem.finale.victoryDelaySeconds;
-  const FinaleElapsedSeconds = Math.min(
-    FinaleDurationSeconds,
-    Math.max(0, ElapsedTimeSeconds - FinaleRestorationStartedAtSeconds),
-  );
+  const FinaleElapsedSeconds = PrefersReducedMotion
+    ? FinaleDurationSeconds
+    : Math.min(
+      FinaleDurationSeconds,
+      Math.max(0, ElapsedTimeSeconds - FinaleRestorationStartedAtSeconds),
+    );
   const FinaleProgress = THREE.MathUtils.smoothstep(
     FinaleElapsedSeconds / FinaleDurationSeconds,
     0,
@@ -3826,6 +3842,7 @@ function handlePointerDown(PointerEventData) {
   }
 
   IsPointerAiming = true;
+  GameCanvas.focus({ preventScroll: true });
   LastAimPointerWorldPosition.copy(CurrentPointerWorldPosition);
   WorldseedSound.beginAim();
   ActivePointerIdentifier = PointerEventData.pointerId;
@@ -4150,7 +4167,7 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
             showStatusToast(WorldDefinition.memory, 2100, 'memory');
           }
           if (GamePhase === 'victoryPending') {
-            VictoryPanelElement.hidden = false;
+            revealVictoryPanel();
             GamePhase = 'victory';
             WorldseedSound.victory();
             hideInstruction();
@@ -4366,7 +4383,7 @@ function updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds) {
  * @param {number} DeltaTimeSeconds - Real frame delta.
  */
 function updateCamera(DeltaTimeSeconds) {
-  if (GamePhase === 'flying') {
+  if (GamePhase === 'flying' && !PrefersReducedMotion) {
     DesiredCameraLookTarget.set(
       THREE.MathUtils.clamp(SeedPhysicsState.position.x * 0.12, -1.8, 1.8),
       THREE.MathUtils.clamp(SeedPhysicsState.position.y * 0.12, -1.5, 1.5),
@@ -4379,12 +4396,13 @@ function updateCamera(DeltaTimeSeconds) {
   const CameraFollowAlpha = 1 - Math.exp(-DeltaTimeSeconds * 2.6);
   CameraLookTarget.lerp(DesiredCameraLookTarget, CameraFollowAlpha);
 
-  if (CameraImpactLifeSeconds > 0) {
+  if (CameraImpactLifeSeconds > 0 && !PrefersReducedMotion) {
     CameraImpactLifeSeconds = Math.max(0, CameraImpactLifeSeconds - DeltaTimeSeconds);
     const ShakeStrength = (CameraImpactLifeSeconds / 0.24) * 0.13;
     Camera.position.x = Math.sin(GameElapsedTimeSeconds * 93) * ShakeStrength;
     Camera.position.y = Math.cos(GameElapsedTimeSeconds * 77) * ShakeStrength;
   } else {
+    CameraImpactLifeSeconds = 0;
     Camera.position.x = 0;
     Camera.position.y = 0;
   }
@@ -4405,6 +4423,8 @@ function resizeRenderer() {
   AdaptivePixelRatioCap = Math.min(AdaptivePixelRatioCap, DevicePixelRatioCap);
   Renderer.setPixelRatio(Math.min(window.devicePixelRatio, AdaptivePixelRatioCap));
   Renderer.setSize(ViewportWidth, ViewportHeight, false);
+  GameCanvas.dataset.viewport = `${ViewportWidth}x${ViewportHeight}`;
+  GameCanvas.dataset.orientation = ViewportWidth >= ViewportHeight ? 'landscape' : 'portrait';
   Camera.aspect = ViewportAspectRatio;
 
   const RequiredWorldHeight = 29;
@@ -4474,6 +4494,9 @@ function updatePerformanceBudget(DeltaTimeSeconds) {
  * Resets objective state, animations and player position to a deterministic opening shot.
  */
 function resetGame() {
+  const ShouldRestoreCanvasFocus = !VictoryPanelElement.hidden
+    && VictoryPanelElement.contains(document.activeElement);
+
   if (RecoveryTimeoutIdentifier !== null) {
     window.clearTimeout(RecoveryTimeoutIdentifier);
     RecoveryTimeoutIdentifier = null;
@@ -4652,6 +4675,9 @@ function resetGame() {
     'Choose ' + OpeningRouteChoices[0].label + ' or ' + OpeningRouteChoices[1].label,
     ActiveSystem.openingBody,
   );
+  if (ShouldRestoreCanvasFocus) {
+    GameCanvas.focus({ preventScroll: true });
+  }
 }
 
 /** Advances at a completed Worldheart, while keeping the campaign frontier replayable. */
@@ -4707,13 +4733,21 @@ window.addEventListener('orientationchange', () => {
 });
 document.addEventListener('visibilitychange', () => {
   IsPageActive = !document.hidden;
+  GameCanvas.dataset.pageActive = String(IsPageActive);
   WorldseedSound.setPageActive(IsPageActive);
   if (IsPageActive) {
     Clock.getDelta();
     resizeRenderer();
   } else if (IsPointerAiming) {
+    const CanceledPointerIdentifier = ActivePointerIdentifier;
     IsPointerAiming = false;
     ActivePointerIdentifier = null;
+    if (
+      CanceledPointerIdentifier !== null
+      && GameCanvas.hasPointerCapture(CanceledPointerIdentifier)
+    ) {
+      GameCanvas.releasePointerCapture(CanceledPointerIdentifier);
+    }
     GameCanvas.classList.remove('is-aiming');
     AimPanelElement.hidden = true;
     clearTrajectoryPreview();
@@ -4724,21 +4758,47 @@ document.addEventListener('visibilitychange', () => {
 GameCanvas.addEventListener('webglcontextlost', (ContextEvent) => {
   ContextEvent.preventDefault();
   IsWebGLContextAvailable = false;
+  GameCanvas.dataset.webglAvailable = 'false';
   WorldseedSound.setPageActive(false);
   showStatusToast('RESTORING GRAPHICS', 1800);
 });
 GameCanvas.addEventListener('webglcontextrestored', () => {
   IsWebGLContextAvailable = true;
+  GameCanvas.dataset.webglAvailable = 'true';
   Clock.getDelta();
   Renderer.resetState();
   resizeRenderer();
   WorldseedSound.setPageActive(IsPageActive);
   showStatusToast('GRAPHICS RESTORED', 900);
 });
+ReducedMotionMediaQuery.addEventListener('change', (PreferenceEvent) => {
+  PrefersReducedMotion = PreferenceEvent.matches;
+  GameCanvas.dataset.reducedMotion = String(PrefersReducedMotion);
+  if (PrefersReducedMotion) {
+    CameraImpactLifeSeconds = 0;
+    DesiredCameraLookTarget.set(0, 0, 0);
+    CameraLookTarget.set(0, 0, 0);
+    Camera.position.x = 0;
+    Camera.position.y = 0;
+    Camera.lookAt(CameraLookTarget);
+  }
+});
 window.addEventListener('keydown', (KeyboardEventData) => {
-  if (KeyboardEventData.key.toLowerCase() === 'r') {
+  if (
+    KeyboardEventData.repeat
+    || KeyboardEventData.ctrlKey
+    || KeyboardEventData.metaKey
+    || KeyboardEventData.altKey
+  ) {
+    return;
+  }
+
+  const PressedKey = KeyboardEventData.key.toLowerCase();
+  if (PressedKey === 'r') {
+    KeyboardEventData.preventDefault();
     resetGame();
-  } else if (KeyboardEventData.key.toLowerCase() === 'm') {
+  } else if (PressedKey === 'm') {
+    KeyboardEventData.preventDefault();
     const IsMuted = WorldseedSound.toggleMute();
     AudioButtonElement.textContent = IsMuted ? 'Audio off [M]' : 'Audio on [M]';
     AudioButtonElement.setAttribute('aria-pressed', String(IsMuted));

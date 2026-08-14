@@ -13,7 +13,7 @@
   <meta property="og:image:height" content="600" />
   <meta name="twitter:card" content="summary_large_image" />
   <title>WORLDSEED</title>
-  <link rel="stylesheet" href="./src/style.css?v=20260814-7r" />
+  <link rel="stylesheet" href="./src/style.css?v=20260814-7s" />
 
   <!--
     Buildless import map for the five-day jam. Three.js is pinned and vendored so startup
@@ -29,7 +29,12 @@
 </head>
 <body>
   <main id="GameShell">
-    <canvas id="GameCanvas" aria-label="WORLDSEED game canvas"></canvas>
+    <canvas
+      id="GameCanvas"
+      tabindex="0"
+      aria-label="WORLDSEED orbital slingshot game. Drag the glowing seed backwards and release to launch."
+      aria-describedby="InstructionPanel"
+    ></canvas>
 
     <header class="hud hud--top">
       <div class="brand">
@@ -56,12 +61,12 @@
       </span>
     </section>
 
-    <section id="InstructionPanel" class="instruction-panel">
+    <section id="InstructionPanel" class="instruction-panel" aria-live="polite" aria-atomic="true">
       <strong id="InstructionTitle">Choose GROVE or EMBER</strong>
       <span id="InstructionBody">Carry the last living seed onward. Pull away from a gold ring, then release.</span>
     </section>
 
-    <section id="AimPanel" class="aim-panel" hidden aria-live="polite">
+    <section id="AimPanel" class="aim-panel" hidden>
       <span id="AimLabel">PULL</span>
       <span class="aim-panel__meter" aria-hidden="true">
         <span id="AimPowerFill" class="aim-panel__fill"></span>
@@ -79,7 +84,15 @@
       <span class="tactical-label tactical-label--worldheart"></span>
     </div>
 
-    <section id="VictoryPanel" class="victory-panel" hidden>
+    <section
+      id="VictoryPanel"
+      class="victory-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="VictoryTitle"
+      aria-describedby="VictoryBody"
+      hidden
+    >
       <span id="VictoryEyebrow" class="victory-panel__eyebrow">FIRST LIGHT RECONNECTED</span>
       <h1 id="VictoryTitle">The Worldheart hears you.</h1>
       <p id="VictoryBody">A living path reaches beyond this tiny system.</p>
@@ -95,12 +108,12 @@
     <footer class="hud hud--bottom">
       <span>Drag + release to launch</span>
       <div class="hud__actions">
-        <button id="AudioButton" type="button" aria-pressed="false">Audio on [M]</button>
-        <button id="ResetButton" type="button">Reset [R]</button>
+        <button id="AudioButton" type="button" aria-pressed="false" aria-keyshortcuts="M">Audio on [M]</button>
+        <button id="ResetButton" type="button" aria-keyshortcuts="R">Reset [R]</button>
       </div>
     </footer>
   </main>
 
-  <script type="module" src="./src/main.js?v=20260814-7r"></script>
+  <script type="module" src="./src/main.js?v=20260814-7s"></script>
 </body>
 </html>

@@ -31,6 +31,9 @@ Use a clean browser at a desktop viewport and again at a portrait mobile viewpor
 8. Awaken any three dormant worlds; confirm `WORLDHEART ROUTE OPEN`, a gold physical Worldheart destination and copy explaining the choice between leaving and earning Bloom.
 9. Aim at the Worldheart; confirm a gold `WORLDHEART LOCKED` prediction. Land there and verify the constellation summary awards Heart while Bloom and Arc reflect the actual run.
 10. On another run, awaken all four worlds and complete the Arc before entering the Worldheart; confirm Heart, Bloom and Arc are all earned, then use Play again and verify a clean reset.
+11. Rotate or resize during an attached shot; confirm the current launch node, counters and instruction remain unchanged and the system reframes without clipping.
+12. Check keyboard focus: the canvas and buttons show a visible outline, `M` toggles audio, `R` resets, completion focuses Replay/Continue, and replay returns focus to the canvas.
+13. With reduced motion enabled at operating-system or browser level, confirm camera follow and impact shake stop and the Worldheart resolves directly to its final restored state.
 
 ## Current checkpoint
 
@@ -71,6 +74,7 @@ The current build includes:
 - procedural Web Audio cues for aim, launch, flight, close passes, impact, restoration, failure and victory;
 - an adaptive three-layer ambient score that builds as worlds awaken, with a one-tap mute control;
 - adaptive mobile pixel density, background pause/resume and WebGL context-recovery handling;
+- polite route announcements, completion-dialog focus management, visible focus rings, 44px touch controls and a reduced-motion presentation path;
 - versioned internal module and stylesheet URLs so rapid static deployments cannot mix stale assets;
 - miniature lighting, soft shadows and restrained biome motion;
 - out-of-bounds recovery;
@@ -89,6 +93,8 @@ Wandering Garden is the first moving-launch chapter. Bower again opens with two 
 Long Night escalates through route geometry instead of a new verb. Vigil offers the readable Pyre line or the much longer Hollow commitment; an optional three-mote arc bends all the way into Beacon, but Eclipse makes the immediate prediction red until its deterministic orbit clears. The chapter requires four awakenings before the Night Heart route opens and banks Arc motes only after survival. Browser evidence covers both desktop openings, the blocked and cleared full Arc, and a complete 390×844 Vigil → Pyre → Umbra → Beacon → Hollow → Night Heart run with failure recovery, close-pass feedback, Replay reset, 20 peak draw calls and no console warnings or errors.
 
 Worldheart is the campaign payoff rather than another escalation mechanic. Confluence offers Kindle's readable line or Memory's four-second commitment; Memory exposes an orbiting one-use Moon, while the direct three-mote Starwell Arc begins behind Last Shadow's deterministic timing window. Four awakenings make the physical core the first suggested route from every launch node, while a fifth world remains optional for Bloom. The final landing delays the summary for a 3.4-second system-wide light pulse. Desktop and 390×844 runs both completed Confluence → Kindle → Dawn → Starwell → Memory → Worldheart, verified the corrected exit guidance, gravity-assist feedback and Replay reset, and peaked at 23 / 22 draw calls with clean consoles.
+
+Campaign hardening now records viewport, orientation, page activity, WebGL availability and reduced-motion state on the canvas for browser evidence without changing simulation. All five chapters load cleanly at 1280×720 and 390×844, preserve their launch node across an 844×390 rotation and remain under the 180-call ceiling. A real portrait touch gesture missed, recovered to Meadow, then landed on Ember with the expected fixed-step launch; reset restored the authored opening and both footer controls measured 44px high. The browser console remained free of warnings and errors. Background-tab visibility could not be forced by the automation surface, so that handler remains an explicit manual release check rather than a claimed browser result.
 
 Completing First Light offers **Continue to BROKEN BELT**, Broken Belt offers **Continue to WANDERING GARDEN**, the Garden offers **Continue to THE LONG NIGHT**, and Long Night offers **Continue to WORLDHEART**. The campaign frontier offers **Replay WORLDHEART**, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
 

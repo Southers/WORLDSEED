@@ -29,6 +29,12 @@ button {
   font: inherit;
 }
 
+button:focus-visible,
+#GameCanvas:focus-visible {
+  outline: 3px solid #dff5a7;
+  outline-offset: 3px;
+}
+
 #GameShell {
   position: relative;
   background:
@@ -477,6 +483,7 @@ button {
 }
 
 .victory-panel button {
+  min-height: 44px;
   padding: 11px 18px;
   border-radius: 999px;
   background: #eaf6e8;
@@ -486,6 +493,7 @@ button {
 
 #ResetButton,
 #AudioButton {
+  min-height: 44px;
   padding: 7px 10px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
@@ -497,6 +505,19 @@ button {
 .hud__actions {
   display: flex;
   gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-delay: 0s !important;
+    transition-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 @media (max-width: 640px) {
