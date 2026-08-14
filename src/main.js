@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7e';
+import { WorldseedAudio } from './audio.js?v=20260814-7f';
+
+import {
+  FirstLightSystemDefinition,
+  createAuthoredSystemRuntime,
+} from './content.js?v=20260814-7f';
 
 import {
   countRestoredWorlds,
@@ -11,7 +16,7 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260814-7e';
+} from './campaign.js?v=20260814-7f';
 
 import {
   calculateBodyPositionAtTime,
@@ -21,12 +26,34 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7e';
+} from './physics.js?v=20260814-7f';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7e';
+} from './restoration.js?v=20260814-7f';
+
+const ActiveSystem = createAuthoredSystemRuntime(FirstLightSystemDefinition, {
+  createVector,
+  createColor: (ColorValue) => new THREE.Color(ColorValue),
+});
+const WorldDefinitions = ActiveSystem.worlds;
+const TacticalBodyDefinitions = ActiveSystem.tacticalBodies;
+const SeedstoneDefinition = TacticalBodyDefinitions.find(
+  (BodyDefinition) => BodyDefinition.kind === 'seedstone',
+);
+const AsteroidDefinition = TacticalBodyDefinitions.find(
+  (BodyDefinition) => BodyDefinition.kind === 'hazard',
+);
+const WorldheartDefinition = TacticalBodyDefinitions.find(
+  (BodyDefinition) => BodyDefinition.kind === 'worldheart',
+);
+const CampaignNodeDefinitions = [
+  ...WorldDefinitions,
+  SeedstoneDefinition,
+  WorldheartDefinition,
+];
+const StardustDefinitions = ActiveSystem.stardust;
 
 /**
  * WORLDSEED — First Light branching-system prototype.
@@ -61,7 +88,7 @@ const ConstellationNodeElements = [...document.querySelectorAll('[data-world-id]
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260814-7e';
+GameCanvas.dataset.build = '20260814-7f';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -72,9 +99,9 @@ const LaunchVelocityPerDragUnit = 2.95;
 const MinimumLaunchDragDistance = 0.22;
 const MaximumTrajectoryPredictionSteps = 520;
 const OutOfBoundsDistance = 34;
-const StartingWorldIdentifier = 'meadow';
+const StartingWorldIdentifier = ActiveSystem.startingWorldIdentifier;
 const MaximumDrawCallBudget = 180;
-const WorldheartUnlockThreshold = 3;
+const WorldheartUnlockThreshold = ActiveSystem.worldheartUnlockThreshold;
 const StardustPickupRadius = 0.22;
 const StardustCollectionRadius = SeedRadius + StardustPickupRadius;
 const MinimumAdaptivePixelRatio = 1;
@@ -140,7 +167,7 @@ let HasLaunchedOnce = false;
 let LaunchPulseLifeSeconds = 0;
 let ImpactPulseLifeSeconds = 0;
 let CameraImpactLifeSeconds = 0;
-let SeedstoneUsesRemaining = 1;
+let SeedstoneUsesRemaining = SeedstoneDefinition.uses;
 let SeedstoneCrumbleStartedAtSeconds = null;
 let WorldheartJustUnlocked = false;
 let PredictedStardustIdentifiers = new Set();
@@ -153,176 +180,10 @@ let SeedPhysicsState = {
 };
 const WorldseedSound = new WorldseedAudio();
 
-/**
- * World definitions are intentionally compact for the greybox. `aliveColor` becomes the
- * basis of the later diorama identity, while `gravitationalParameter` is tuned for play,
- * not astronomical realism.
- */
-const WorldDefinitions = [
-  {
-    id: 'meadow',
-    label: 'MEADOW',
-    position: createVector(-8.0, -6.4, 0),
-    radius: 3.35,
-    gravitationalParameter: 92,
-    aliveColor: new THREE.Color(0x5f9b63),
-    atmosphereColor: new THREE.Color(0x9bcfb4),
-    restored: true,
-    isStartingWorld: true,
-    memory: 'The seed remembered rain.',
-    restoration: {
-      durationSeconds: 2.2,
-      waveWidth: 0.045,
-      growthTrailWidth: 0.18,
-      waveColor: new THREE.Color(0xe8ffc5),
-      atmosphereOpacity: 0.15,
-      rotationSpeed: 0.00035,
-      surfaceVariation: 0.1,
-    },
-  },
-  {
-    id: 'ember',
-    label: 'EMBER',
-    position: createVector(7.8, -3.3, 0),
-    radius: 3.0,
-    gravitationalParameter: 82,
-    aliveColor: new THREE.Color(0xc47a46),
-    atmosphereColor: new THREE.Color(0xffbe78),
-    restored: false,
-    isStartingWorld: false,
-    memory: 'One spark had waited beneath the stone.',
-    restoration: {
-      durationSeconds: 2.35,
-      waveWidth: 0.05,
-      growthTrailWidth: 0.18,
-      waveColor: new THREE.Color(0xffdfa1),
-      atmosphereOpacity: 0.16,
-      rotationSpeed: 0.00125,
-      surfaceVariation: 0.045,
-    },
-  },
-  {
-    id: 'grove',
-    label: 'GROVE',
-    position: createVector(-8.8, 3.0, 0),
-    radius: 2.05,
-    gravitationalParameter: 44,
-    aliveColor: new THREE.Color(0x78aa66),
-    atmosphereColor: new THREE.Color(0xb7e5a4),
-    restored: false,
-    isStartingWorld: false,
-    isPrototypeWorld: true,
-    memory: 'The roots were still holding hands.',
-    biomeStyle: 1,
-    accentColor: new THREE.Color(0xc6e886),
-    restoration: {
-      durationSeconds: 1.85,
-      waveWidth: 0.055,
-      growthTrailWidth: 0.2,
-      waveColor: new THREE.Color(0xddffbc),
-      atmosphereOpacity: 0,
-      rotationSpeed: 0.0007,
-      surfaceVariation: 0.08,
-    },
-  },
-  {
-    id: 'frost',
-    label: 'FROST',
-    position: createVector(0.7, 8.0, 0),
-    radius: 3.55,
-    gravitationalParameter: 102,
-    aliveColor: new THREE.Color(0x81b6c9),
-    atmosphereColor: new THREE.Color(0xbbe8f5),
-    restored: false,
-    isStartingWorld: false,
-    memory: 'Under the ice, the old ocean was still dreaming.',
-    restoration: {
-      durationSeconds: 2.65,
-      waveWidth: 0.042,
-      growthTrailWidth: 0.2,
-      waveColor: new THREE.Color(0xe4fbff),
-      atmosphereOpacity: 0.18,
-      rotationSpeed: 0.001,
-      surfaceVariation: 0.035,
-    },
-  },
-  {
-    id: 'tide',
-    label: 'TIDE',
-    position: createVector(9.7, 6.0, 0),
-    radius: 2.15,
-    gravitationalParameter: 48,
-    aliveColor: new THREE.Color(0x4d91aa),
-    atmosphereColor: new THREE.Color(0x9ce7ef),
-    restored: false,
-    isStartingWorld: false,
-    isPrototypeWorld: true,
-    memory: 'The moon-pulled water found its rhythm.',
-    biomeStyle: 2,
-    accentColor: new THREE.Color(0x9de9df),
-    restoration: {
-      durationSeconds: 1.95,
-      waveWidth: 0.052,
-      growthTrailWidth: 0.2,
-      waveColor: new THREE.Color(0xb9fbff),
-      atmosphereOpacity: 0,
-      rotationSpeed: 0.00085,
-      surfaceVariation: 0.06,
-    },
-  },
-];
-
-/** Tactical bodies are collision targets but do not count toward world restoration. */
-const SeedstoneDefinition = {
-  id: 'seedstone',
-  label: 'SEEDSTONE',
-  kind: 'seedstone',
-  position: createVector(0.15, -0.55, 0),
-  radius: 0.72,
-  restored: true,
-  countsTowardRestoration: false,
-};
-const AsteroidDefinition = {
-  id: 'wayfarer',
-  label: 'WAYFARER',
-  kind: 'hazard',
-  radius: 0.66,
-  countsTowardRestoration: false,
-  orbit: {
-    centre: createVector(0.7, 8, 0),
-    radius: 5.35,
-    phaseRadians: -1.18,
-    angularSpeedRadiansPerSecond: 0.34,
-  },
-};
-const WorldheartDefinition = {
-  id: 'worldheart',
-  label: 'WORLDHEART',
-  kind: 'worldheart',
-  position: createVector(-4.35, 8.75, 0),
-  radius: 0.9,
-  restored: false,
-  countsTowardRestoration: false,
-  isRouteDestination: true,
-  routeAvailable: false,
-};
-const TacticalBodyDefinitions = [
-  SeedstoneDefinition,
-  AsteroidDefinition,
-  WorldheartDefinition,
-];
-const CampaignNodeDefinitions = [
-  ...WorldDefinitions,
-  SeedstoneDefinition,
-  WorldheartDefinition,
-];
-const StardustDefinitions = [
-  { id: 'first-light-arc-1', position: createVector(-1.56, -2.72, 0), collected: false },
-  { id: 'first-light-arc-2', position: createVector(-1.20, -0.45, 0), collected: false },
-  { id: 'first-light-arc-3', position: createVector(-0.99, 1.45, 0), collected: false },
-];
-
 const WorldRuntimeByIdentifier = new Map();
+const WorldRuntimesByVisualKey = new Map();
+const EmptyWorldRuntimeList = [];
+const ShaderMotionVisualKeys = ['grove', 'tide'];
 const DeadWorldColor = new THREE.Color(0x575d60);
 const DarkWorldColor = new THREE.Color(0x2c3337);
 const RestorableWorldCount = getRestorableWorlds(WorldDefinitions).length;
@@ -957,9 +818,16 @@ function createTideSurfaceGeometry(WorldDefinition) {
 
 /** Selects the one-call authored geometry used by a lightweight First Light route world. */
 function createPrototypeSurfaceGeometry(WorldDefinition) {
-  return WorldDefinition.id === 'grove'
-    ? createGroveSurfaceGeometry(WorldDefinition)
-    : createTideSurfaceGeometry(WorldDefinition);
+  const PrototypeGeometryFactories = {
+    grove: createGroveSurfaceGeometry,
+    tide: createTideSurfaceGeometry,
+  };
+  return (
+    PrototypeGeometryFactories[WorldDefinition.visualKey]
+    ?? ((Definition) => addRestorationGeometryAttributes(
+      new THREE.IcosahedronGeometry(Definition.radius, 3),
+    ))
+  )(WorldDefinition);
 }
 
 /** Creates Meadow's authored low-poly cottage landmark. */
@@ -1654,7 +1522,7 @@ function createWorld(WorldDefinition) {
   const SurfaceMarkerGroup = WorldDefinition.isPrototypeWorld
     ? new THREE.Group()
     : (
-      SurfacePropFactories[WorldDefinition.id] ?? createPlaceholderSurfaceProps
+      SurfacePropFactories[WorldDefinition.visualKey] ?? createPlaceholderSurfaceProps
     )(WorldDefinition);
 
   for (const SurfacePropObject of SurfaceMarkerGroup.children) {
@@ -1675,14 +1543,14 @@ function createWorld(WorldDefinition) {
   const AmbientMoteGroup = WorldDefinition.isPrototypeWorld
     ? null
     : (
-      WorldDefinition.id === 'meadow'
+      WorldDefinition.visualKey === 'meadow'
         ? createMeadowMotes(WorldDefinition)
         : createBiomeMotes(
           WorldDefinition,
-          WorldDefinition.id === 'ember' ? 30 : 34,
-          WorldDefinition.id === 'ember' ? 0xff7b32 : 0xcdf8ff,
-          WorldDefinition.id === 'ember' ? 0.105 : 0.085,
-          WorldDefinition.id === 'ember' ? 0.78 : 0.64,
+          WorldDefinition.visualKey === 'ember' ? 30 : 34,
+          WorldDefinition.visualKey === 'ember' ? 0xff7b32 : 0xcdf8ff,
+          WorldDefinition.visualKey === 'ember' ? 0.105 : 0.085,
+          WorldDefinition.visualKey === 'ember' ? 0.78 : 0.64,
         )
     );
   if (AmbientMoteGroup) {
@@ -1693,7 +1561,8 @@ function createWorld(WorldDefinition) {
   }
   Scene.add(WorldGroup);
 
-  WorldRuntimeByIdentifier.set(WorldDefinition.id, {
+  const WorldRuntime = {
+    definition: WorldDefinition,
     group: WorldGroup,
     surfaceMesh: SurfaceMesh,
     surfaceMaterial: SurfaceMaterial,
@@ -1707,7 +1576,12 @@ function createWorld(WorldDefinition) {
     restorationOriginLocal: new THREE.Vector3(1, 0, 0),
     restorationStartedAtSeconds: WorldDefinition.restored ? -Infinity : null,
     restorationCompleted: WorldDefinition.restored,
-  });
+  };
+  WorldRuntimeByIdentifier.set(WorldDefinition.id, WorldRuntime);
+  if (!WorldRuntimesByVisualKey.has(WorldDefinition.visualKey)) {
+    WorldRuntimesByVisualKey.set(WorldDefinition.visualKey, []);
+  }
+  WorldRuntimesByVisualKey.get(WorldDefinition.visualKey).push(WorldRuntime);
 }
 
 for (const WorldDefinition of WorldDefinitions) {
@@ -2023,9 +1897,19 @@ function getActiveTacticalBodyDefinitions() {
   ));
 }
 
+/** Applies authored route emphasis while leaving every physical destination valid. */
+function getCurrentRouteChoices(MaximumChoiceCount = 2) {
+  return getRouteChoices(
+    CampaignNodeDefinitions,
+    CurrentWorldIdentifier,
+    MaximumChoiceCount,
+    ActiveSystem.routeSuggestions[CurrentWorldIdentifier] ?? [],
+  );
+}
+
 /** Reveals the nearest useful routes while leaving every physical destination valid. */
 function showRouteChoiceInstruction() {
-  const RouteChoices = getRouteChoices(CampaignNodeDefinitions, CurrentWorldIdentifier, 2);
+  const RouteChoices = getCurrentRouteChoices(2);
   const HasWorldheartChoice = RouteChoices.some(
     (RouteChoice) => RouteChoice.id === WorldheartDefinition.id,
   );
@@ -2061,7 +1945,7 @@ function showRouteChoiceInstruction() {
 function updateTargetBeacons(ElapsedTimeSeconds) {
   const ShouldShowChoices = GamePhase === 'attached';
   const RouteChoices = ShouldShowChoices
-    ? getRouteChoices(CampaignNodeDefinitions, CurrentWorldIdentifier, 2)
+    ? getCurrentRouteChoices(2)
     : [];
   const PulseScale = 1 + (Math.sin(ElapsedTimeSeconds * 3.4) * 0.025);
 
@@ -2090,11 +1974,7 @@ function updateTargetBeacons(ElapsedTimeSeconds) {
 /** Projects suggested world names into the HUD without spending WebGL draw calls. */
 function updateRouteLabels() {
   const RouteChoices = GamePhase === 'attached'
-    ? getRouteChoices(
-      CampaignNodeDefinitions,
-      CurrentWorldIdentifier,
-      RouteLabelElements.length,
-    )
+    ? getCurrentRouteChoices(RouteLabelElements.length)
     : [];
 
   for (let LabelIndex = 0; LabelIndex < RouteLabelElements.length; LabelIndex += 1) {
@@ -3325,71 +3205,84 @@ function updateFlightAudio() {
 
 /** Adds distinct, restrained biome motion without distracting from aiming. */
 function updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds) {
-  const MeadowRuntime = WorldRuntimeByIdentifier.get('meadow');
-  const EmberRuntime = WorldRuntimeByIdentifier.get('ember');
-  const FrostRuntime = WorldRuntimeByIdentifier.get('frost');
-  const GroveRuntime = WorldRuntimeByIdentifier.get('grove');
-  const TideRuntime = WorldRuntimeByIdentifier.get('tide');
+  for (const VisualKey of ShaderMotionVisualKeys) {
+    for (const WorldRuntime of (
+      WorldRuntimesByVisualKey.get(VisualKey) ?? EmptyWorldRuntimeList
+    )) {
+      WorldRuntime.restorationUniforms.biomeTime.value = ElapsedTimeSeconds;
+    }
+  }
 
-  GroveRuntime.restorationUniforms.biomeTime.value = ElapsedTimeSeconds;
-  TideRuntime.restorationUniforms.biomeTime.value = ElapsedTimeSeconds;
+  for (const MeadowRuntime of (
+    WorldRuntimesByVisualKey.get('meadow') ?? EmptyWorldRuntimeList
+  )) {
+    for (const SurfacePropObject of MeadowRuntime.surfaceMarkerGroup.children) {
+      if (SurfacePropObject.userData.swayAmount) {
+        const SwayAngle = Math.sin(
+          (ElapsedTimeSeconds * 1.55) + SurfacePropObject.userData.swayPhase,
+        ) * SurfacePropObject.userData.swayAmount;
+        SurfaceSwayQuaternion.setFromAxisAngle(LocalSwayAxis, SwayAngle);
+        SurfacePropObject.quaternion.copy(SurfacePropObject.userData.baseQuaternion).multiply(
+          SurfaceSwayQuaternion,
+        );
+      }
 
-  for (const SurfacePropObject of MeadowRuntime.surfaceMarkerGroup.children) {
-    if (SurfacePropObject.userData.swayAmount) {
-      const SwayAngle = Math.sin(
-        (ElapsedTimeSeconds * 1.55) + SurfacePropObject.userData.swayPhase,
-      ) * SurfacePropObject.userData.swayAmount;
-      SurfaceSwayQuaternion.setFromAxisAngle(LocalSwayAxis, SwayAngle);
-      SurfacePropObject.quaternion.copy(SurfacePropObject.userData.baseQuaternion).multiply(
-        SurfaceSwayQuaternion,
+      if (SurfacePropObject.userData.kind === 'pond') {
+        SurfacePropObject.userData.waterMaterial.emissiveIntensity = 0.4
+          + (Math.sin(ElapsedTimeSeconds * 1.8) * 0.08);
+      }
+
+      if (SurfacePropObject.userData.kind === 'cottage') {
+        SurfacePropObject.userData.windowMaterial.emissiveIntensity = 0.7
+          + (Math.sin((ElapsedTimeSeconds * 2.1) + 0.6) * 0.08);
+      }
+    }
+
+    if (MeadowRuntime.ambientMoteGroup) {
+      MeadowRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.09;
+      MeadowRuntime.ambientMoteGroup.rotation.z += DeltaTimeSeconds * 0.025;
+      MeadowRuntime.ambientMoteGroup.material.opacity = (
+        MeadowRuntime.ambientMoteGroup.userData.baseOpacity
+        + (Math.sin(ElapsedTimeSeconds * 2.4) * 0.1)
       );
     }
-
-    if (SurfacePropObject.userData.kind === 'pond') {
-      SurfacePropObject.userData.waterMaterial.emissiveIntensity = 0.4
-        + (Math.sin(ElapsedTimeSeconds * 1.8) * 0.08);
-    }
-
-    if (SurfacePropObject.userData.kind === 'cottage') {
-      SurfacePropObject.userData.windowMaterial.emissiveIntensity = 0.7
-        + (Math.sin((ElapsedTimeSeconds * 2.1) + 0.6) * 0.08);
-    }
   }
 
-  if (MeadowRuntime.ambientMoteGroup) {
-    MeadowRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.09;
-    MeadowRuntime.ambientMoteGroup.rotation.z += DeltaTimeSeconds * 0.025;
-    MeadowRuntime.ambientMoteGroup.material.opacity = MeadowRuntime.ambientMoteGroup.userData.baseOpacity
-      + (Math.sin(ElapsedTimeSeconds * 2.4) * 0.1);
-  }
-
-  for (const SurfacePropObject of EmberRuntime.surfaceMarkerGroup.children) {
-    const LavaMaterial = SurfacePropObject.userData.lavaMaterial
-      ?? SurfacePropObject.userData.heatMaterial;
-    if (LavaMaterial && getWorldDefinition('ember').restored) {
-      const Phase = SurfacePropObject.userData.motionPhase ?? 0;
-      const BaseIntensity = SurfacePropObject.userData.kind === 'volcano' ? 2.2 : 1.8;
-      LavaMaterial.emissiveIntensity = BaseIntensity
-        + (Math.sin((ElapsedTimeSeconds * 4.2) + Phase) * 0.24);
+  for (const EmberRuntime of (
+    WorldRuntimesByVisualKey.get('ember') ?? EmptyWorldRuntimeList
+  )) {
+    for (const SurfacePropObject of EmberRuntime.surfaceMarkerGroup.children) {
+      const LavaMaterial = SurfacePropObject.userData.lavaMaterial
+        ?? SurfacePropObject.userData.heatMaterial;
+      if (LavaMaterial && EmberRuntime.definition.restored) {
+        const Phase = SurfacePropObject.userData.motionPhase ?? 0;
+        const BaseIntensity = SurfacePropObject.userData.kind === 'volcano' ? 2.2 : 1.8;
+        LavaMaterial.emissiveIntensity = BaseIntensity
+          + (Math.sin((ElapsedTimeSeconds * 4.2) + Phase) * 0.24);
+      }
+    }
+    if (EmberRuntime.ambientMoteGroup) {
+      EmberRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.34;
+      EmberRuntime.ambientMoteGroup.rotation.z -= DeltaTimeSeconds * 0.09;
     }
   }
-  if (EmberRuntime.ambientMoteGroup) {
-    EmberRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.34;
-    EmberRuntime.ambientMoteGroup.rotation.z -= DeltaTimeSeconds * 0.09;
-  }
 
-  for (const SurfacePropObject of FrostRuntime.surfaceMarkerGroup.children) {
-    const CrystalMaterial = SurfacePropObject.userData.crystalMaterial;
-    if (CrystalMaterial && getWorldDefinition('frost').restored) {
-      const Phase = SurfacePropObject.userData.motionPhase ?? 0;
-      const BaseIntensity = SurfacePropObject.userData.kind === 'iceArch' ? 0.62 : 0.58;
-      CrystalMaterial.emissiveIntensity = BaseIntensity
-        + (Math.sin((ElapsedTimeSeconds * 1.25) + Phase) * 0.1);
+  for (const FrostRuntime of (
+    WorldRuntimesByVisualKey.get('frost') ?? EmptyWorldRuntimeList
+  )) {
+    for (const SurfacePropObject of FrostRuntime.surfaceMarkerGroup.children) {
+      const CrystalMaterial = SurfacePropObject.userData.crystalMaterial;
+      if (CrystalMaterial && FrostRuntime.definition.restored) {
+        const Phase = SurfacePropObject.userData.motionPhase ?? 0;
+        const BaseIntensity = SurfacePropObject.userData.kind === 'iceArch' ? 0.62 : 0.58;
+        CrystalMaterial.emissiveIntensity = BaseIntensity
+          + (Math.sin((ElapsedTimeSeconds * 1.25) + Phase) * 0.1);
+      }
     }
-  }
-  if (FrostRuntime.ambientMoteGroup) {
-    FrostRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.045;
-    FrostRuntime.ambientMoteGroup.rotation.x += DeltaTimeSeconds * 0.018;
+    if (FrostRuntime.ambientMoteGroup) {
+      FrostRuntime.ambientMoteGroup.rotation.y += DeltaTimeSeconds * 0.045;
+      FrostRuntime.ambientMoteGroup.rotation.x += DeltaTimeSeconds * 0.018;
+    }
   }
 }
 
@@ -3608,39 +3501,40 @@ function resetGame() {
   GameCanvas.dataset.lastMemory = '';
 
   for (const WorldDefinition of WorldDefinitions) {
-    WorldDefinition.restored = WorldDefinition.isStartingWorld;
+    const IsInitiallyRestored = WorldDefinition.initiallyRestored === true;
+    WorldDefinition.restored = IsInitiallyRestored;
     const WorldRuntime = WorldRuntimeByIdentifier.get(WorldDefinition.id);
-    WorldRuntime.restorationStartedAtSeconds = WorldDefinition.isStartingWorld ? -Infinity : null;
-    WorldRuntime.restorationCompleted = WorldDefinition.isStartingWorld;
+    WorldRuntime.restorationStartedAtSeconds = IsInitiallyRestored ? -Infinity : null;
+    WorldRuntime.restorationCompleted = IsInitiallyRestored;
     WorldRuntime.restorationOriginLocal.set(1, 0, 0);
     WorldRuntime.restorationUniforms.restorationOrigin.value.set(1, 0, 0);
-    WorldRuntime.restorationUniforms.restorationProgress.value = WorldDefinition.isStartingWorld
+    WorldRuntime.restorationUniforms.restorationProgress.value = IsInitiallyRestored
       ? 1.2
       : -0.1;
     WorldRuntime.restorationWaveMesh.visible = false;
     WorldRuntime.surfaceMaterial.color.set(0xffffff);
-    WorldRuntime.atmosphereMaterial.opacity = WorldDefinition.isStartingWorld
+    WorldRuntime.atmosphereMaterial.opacity = IsInitiallyRestored
       ? WorldDefinition.restoration.atmosphereOpacity
       : 0.025;
-    WorldRuntime.atmosphereMesh.scale.setScalar(WorldDefinition.isStartingWorld ? 1 : 0.96);
-    WorldRuntime.contourRingGroup.visible = WorldDefinition.isStartingWorld;
+    WorldRuntime.atmosphereMesh.scale.setScalar(IsInitiallyRestored ? 1 : 0.96);
+    WorldRuntime.contourRingGroup.visible = IsInitiallyRestored;
     WorldRuntime.contourRingGroup.rotation.set(0, 0, 0);
     WorldRuntime.contourRingGroup.scale.setScalar(1);
     WorldRuntime.group.rotation.set(0, 0, 0);
     WorldRuntime.group.scale.setScalar(1);
     if (WorldRuntime.ambientMoteGroup) {
       WorldRuntime.ambientMoteGroup.rotation.set(0, 0, 0);
-      WorldRuntime.ambientMoteGroup.material.opacity = WorldDefinition.isStartingWorld
+      WorldRuntime.ambientMoteGroup.material.opacity = IsInitiallyRestored
         ? WorldRuntime.ambientMoteGroup.userData.baseOpacity
         : 0;
     }
 
     for (const SurfacePropObject of WorldRuntime.surfaceMarkerGroup.children) {
-      const RestorationProgress = WorldDefinition.isStartingWorld ? 1 : 0;
+      const RestorationProgress = IsInitiallyRestored ? 1 : 0;
       setSurfacePropRestorationProgress(SurfacePropObject, RestorationProgress);
-      SurfacePropObject.userData.restorationDistance = WorldDefinition.isStartingWorld ? 0 : 1;
+      SurfacePropObject.userData.restorationDistance = IsInitiallyRestored ? 0 : 1;
       SurfacePropObject.scale.setScalar(
-        SurfacePropObject.userData.baseScale * (WorldDefinition.isStartingWorld ? 1 : 0.05),
+        SurfacePropObject.userData.baseScale * (IsInitiallyRestored ? 1 : 0.05),
       );
     }
   }
@@ -3652,7 +3546,9 @@ function resetGame() {
   TrailParticleMesh.instanceMatrix.needsUpdate = true;
 
   const StartingWorldDefinition = getWorldDefinition(StartingWorldIdentifier);
-  const FirstTargetWorldDefinition = getWorldDefinition('ember');
+  const FirstTargetWorldDefinition = getWorldDefinition(
+    ActiveSystem.openingGuideTargetIdentifier,
+  );
   TemporaryThreeVector.set(
     FirstTargetWorldDefinition.position.x - StartingWorldDefinition.position.x,
     FirstTargetWorldDefinition.position.y - StartingWorldDefinition.position.y,
@@ -3679,10 +3575,10 @@ function resetGame() {
   );
   LaunchIgnoredWorldIdentifier = null;
   LaunchIgnoredBodyIdentifier = null;
-  SeedstoneUsesRemaining = 1;
+  SeedstoneUsesRemaining = SeedstoneDefinition.uses;
   SeedstoneCrumbleStartedAtSeconds = null;
-  WorldheartDefinition.routeAvailable = false;
-  WorldheartDefinition.restored = false;
+  WorldheartDefinition.routeAvailable = WorldheartDefinition.routeAvailableInitially === true;
+  WorldheartDefinition.restored = WorldheartDefinition.initiallyRestored === true;
   WorldheartJustUnlocked = false;
   for (const StardustDefinition of StardustDefinitions) {
     StardustDefinition.collected = false;
@@ -3720,6 +3616,7 @@ function resetGame() {
     CampaignNodeDefinitions,
     StartingWorldIdentifier,
     2,
+    ActiveSystem.routeSuggestions[StartingWorldIdentifier] ?? [],
   );
   showInstruction(
     'Choose ' + OpeningRouteChoices[0].label + ' or ' + OpeningRouteChoices[1].label,

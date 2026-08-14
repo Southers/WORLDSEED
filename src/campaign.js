@@ -72,15 +72,16 @@ export function getLandingAccolade({
 }
 
 /**
- * Suggests the nearest unrestored destinations from the current launch node.
+ * Suggests authored unrestored destinations, then falls back to spatial proximity.
  *
- * This does not restrict physics or force a target. It gives the player readable options
- * while every world remains a valid deterministic collision body.
+ * This does not restrict physics or force a target. Optional authoring order makes route
+ * purpose legible while every world remains a valid deterministic collision body.
  */
 export function getRouteChoices(
   WorldDefinitions,
   CurrentWorldIdentifier,
   MaximumChoiceCount = 2,
+  PreferredDestinationIdentifiers = [],
 ) {
   const CurrentWorldDefinition = WorldDefinitions.find(
     (WorldDefinition) => WorldDefinition.id === CurrentWorldIdentifier,
@@ -106,6 +107,7 @@ export function getRouteChoices(
       return {
         definition: WorldDefinition,
         definitionIndex: DefinitionIndex,
+        preferenceIndex: PreferredDestinationIdentifiers.indexOf(WorldDefinition.id),
         distanceSquared: (
           (DifferenceX * DifferenceX)
           + (DifferenceY * DifferenceY)
@@ -114,6 +116,11 @@ export function getRouteChoices(
       };
     })
     .sort((FirstChoice, SecondChoice) => (
+      (
+        (FirstChoice.preferenceIndex < 0 ? Infinity : FirstChoice.preferenceIndex)
+        - (SecondChoice.preferenceIndex < 0 ? Infinity : SecondChoice.preferenceIndex)
+      )
+      ||
       (FirstChoice.distanceSquared - SecondChoice.distanceSquared)
       || (FirstChoice.definitionIndex - SecondChoice.definitionIndex)
     ))

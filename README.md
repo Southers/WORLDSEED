@@ -33,6 +33,8 @@ The current build includes:
 - drag-to-launch pointer controls;
 - trajectory prediction using the same physics model as the live seed;
 - outcome-driven landings on any physical destination rather than a scripted target order;
+- a validated authored-system definition that keeps world physics, visual identity, story, tactical bodies, route emphasis, objectives and mastery content together;
+- isolated mutable runtime state cloned from authored content so Reset and future systems do not mutate their source definitions;
 - two suggested route choices with world-space HUD labels and a single instanced beacon draw call;
 - persistent restored launch nodes, so landing order changes the next useful geometry;
 - gold new-world locks, green safe-landing locks and explicit no-landing feedback;
@@ -61,7 +63,7 @@ The current build includes:
 
 Meadow, Ember and Frost remain the full diorama benchmark. Grove and Tide now carry a deliberate lightweight identity without spending extra draw calls: Grove reveals a joined-root arch, clustered saplings and slow root veins, while Tide reveals moving water bands and repeating crest relief around its circumference. They remain compact route worlds rather than full dioramas, preserving room for the larger authored systems.
 
-The current playable build is the tactical First Light prototype. Grove-first recommends Frost/Ember next, while Ember-first recommends Tide/Frost; every world remains physically landable regardless of the suggestion. The Seedstone creates an optional setup route, while the asteroid turns launch timing into a visible decision instead of a random failure. The Arc places three optional motes on an expressive Meadow-to-Frost curve: prediction promises the pickup count, and timing Wayfarer determines whether the player completes it. Three awakenings open the Worldheart route; entering it completes Heart immediately, while all four worlds and all three motes separately earn Bloom and Arc. The environmental-story checkpoint completed desktop Grove and 390×844 portrait-mobile Tide landings, deliberate void recovery, reset and a full mobile Worldheart run. The measured run peaked at 179 draw calls with a clean final console.
+The current playable build is the tactical First Light prototype and compatibility fixture for the authored-system pipeline. Grove-first recommends Frost/Ember next, while Ember-first recommends Tide/Frost; authored suggestions prioritise those useful branches but every world remains physically landable. The Seedstone creates an optional setup route, while the asteroid turns launch timing into a visible decision instead of a random failure. The Arc places three optional motes on an expressive Meadow-to-Frost curve: prediction promises the pickup count, and timing Wayfarer determines whether the player completes it. Three awakenings open the Worldheart route; entering it completes Heart immediately, while all four worlds and all three motes separately earn Bloom and Arc. Pipeline browser evidence covers both desktop opening branches, portrait void recovery, the complete Ember → Tide → Frost → Worldheart path and Play again. The measured run peaked at 179 draw calls with a clean console.
 
 ### Visual budget
 
@@ -114,5 +116,6 @@ Submission preparation is part of the roadmap: keep the public build, credits, e
 - `AGENTS.md` defines the implementation objective, priorities and quality gates.
 - `DESIGN.md` defines the player promise, core loop and scope.
 - `JAM_PLAN.md` defines the campaign milestones, validation gates and cut order.
+- `src/content.js` defines and validates authored systems before mutable runtime state is created.
 - `CREDITS.md` tracks every external dependency and asset.
 - `SUBMISSION.md` is the working entry package and final user-approval checklist.

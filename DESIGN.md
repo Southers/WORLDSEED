@@ -46,6 +46,22 @@ The campaign is a sequence of authored planetary systems rather than one unbound
 
 Names and world counts are provisional. Each system must earn its place through a distinct spatial problem and awakening identity.
 
+## Authored-system contract
+
+`src/content.js` is the campaign's pure-data boundary. Every system definition owns:
+
+- its identity, starting world, opening guide target and Worldheart threshold;
+- world physics, a bounded `visualKey`, awakening memory and restoration palette/timing;
+- Seedstones, deterministic hazard orbits and the physical Worldheart exit;
+- authored route suggestions that prioritise useful choices without restricting valid collisions;
+- optional stardust positions and other system mastery data.
+
+The validator rejects duplicate or missing identifiers, broken route references, incomplete restoration fields, invalid physics values and impossible objective thresholds before WebGL starts. Runtime creation then clones that validated definition into isolated mutable state, injecting the vector and colour types required by Three.js. Reset restores authored initial state rather than reconstructing content through hard-coded world names.
+
+The current tactical renderer deliberately validates exactly one Seedstone, one deterministic hazard and one Worldheart. Broken Belt must generalise that bounded renderer before authoring additional simultaneous small bodies; invisible collision bodies are never acceptable.
+
+A new system should therefore require one data definition plus deliberately registered visual factories. It must not require a second physics implementation, per-system branches throughout the game loop or duplicated prediction logic. First Light is the behavioural compatibility fixture for this contract.
+
 ## Meaningful decisions
 
 Every shot should support at least one real decision:
