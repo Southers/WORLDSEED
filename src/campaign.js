@@ -46,6 +46,32 @@ export function getSystemEmblems(
 }
 
 /**
+ * Selects the most meaningful concise accolade earned by a completed shot.
+ *
+ * Close asteroid passes take priority because they are the highest-risk event. Passing
+ * another world before landing elsewhere communicates a gravity assist, while returning
+ * cleanly to an already restored node still receives a small acknowledgement.
+ */
+export function getLandingAccolade({
+  hadAsteroidClosePass = false,
+  closePassWorldIdentifiers = [],
+  landingWorldIdentifier = null,
+  isNewWorldLanding = false,
+} = {}) {
+  if (hadAsteroidClosePass) {
+    return 'CLOSE PASS';
+  }
+
+  if ([...closePassWorldIdentifiers].some(
+    (WorldIdentifier) => WorldIdentifier !== landingWorldIdentifier,
+  )) {
+    return 'GRAVITY ASSIST';
+  }
+
+  return isNewWorldLanding ? null : 'CLEAN LANDING';
+}
+
+/**
  * Suggests the nearest unrestored destinations from the current launch node.
  *
  * This does not restrict physics or force a target. It gives the player readable options

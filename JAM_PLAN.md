@@ -57,6 +57,8 @@ Checkpoint: complete in First Light with an always-visible three-pip Worldheart 
 
 Exit: the player can describe what the seed is doing and why the journey matters.
 
+Checkpoint: first pass implemented in First Light. The opening now names the last living seed and its Worldheart destination; every world carries a concise awakening memory in the existing non-blocking restoration panel; and successful fixed-step flights can report `CLOSE PASS`, `GRAVITY ASSIST` or `CLEAN LANDING` without changing prediction or controls. Route-opening and Arc mastery feedback remain intact. Portrait browser evidence proves the Ember and Tide memories plus an authored Meadow-to-Tide gravity assist. System-level environmental storytelling remains the next art/content pass.
+
 ## Milestone 5 — The Broken Belt vertical slice
 
 - Replace greybox destinations with five to seven authored worlds, moons and Seedstones.

@@ -41,6 +41,8 @@ The current build includes:
 - red predicted-collision feedback plus fast `ASTEROID IMPACT` recovery;
 - a three-pickup Meadow-to-Frost Arc whose motes turn gold under a matching prediction and persist as `ARC 3 / 3` mastery for the run;
 - a compact three-world Worldheart threshold, gold physical exit shot and honest Heart/Bloom/Arc completion summary;
+- a concise awakening memory for every world, shown inside the existing restoration flow without pausing control;
+- deterministic `CLOSE PASS`, `GRAVITY ASSIST` and `CLEAN LANDING` accolades derived from the successful live flight;
 - lightweight Grove and Tide route prototypes alongside the three authored worlds;
 - world collisions and landing;
 - configurable planet-wrapping restoration waves driven by spherical distance from impact;
