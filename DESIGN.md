@@ -40,7 +40,7 @@ The campaign is a sequence of authored planetary systems rather than one unbound
 
 - **Prologue — First Light:** authored Meadow → Ember → Frost establishes the full-diorama visual bar while Grove's joined roots, Tide's encircling wave crests, a one-use Seedstone, the orbiting Wayfarer and a three-mote Arc prove branching routes, persistent launch nodes, environmental story, deterministic timing windows and optional mastery.
 - **System I — The Broken Belt:** six fractured relay worlds turn the opening into a safe Kiln route or a high Loom route that carries the full Arc. A central Vault creates a third launch geometry, while the predictable Sentinel orbit guards the Shard/Drift side of the system.
-- **System II — The Wandering Garden:** develops moving launch windows, moons and optional route challenges.
+- **System II — The Wandering Garden:** six living worlds surround an orbiting one-use Pollen Moon. Waiting changes whether that moon intersects a shot and where its carried seed can launch next, while Thornwing turns the upper garden into a readable moving-risk route.
 - **System III — The Long Night:** combines longer gravity assists, tighter safe routes and stronger narrative stakes.
 - **Finale — Worldheart:** asks the player to use the full route vocabulary before delivering the largest restoration in the game.
 
@@ -61,9 +61,11 @@ Worldheart completion is the campaign handoff. When another authored chapter exi
 
 The validator rejects duplicate or missing identifiers, broken route references, incomplete restoration fields, invalid physics values and impossible objective thresholds before WebGL starts. Runtime creation then clones that validated definition into isolated mutable state, injecting the vector and colour types required by Three.js. Reset restores authored initial state rather than reconstructing content through hard-coded world names.
 
-The current tactical renderer deliberately validates exactly one Seedstone, one deterministic hazard and one Worldheart. Broken Belt must generalise that bounded renderer before authoring additional simultaneous small bodies; invisible collision bodies are never acceptable.
+The current tactical renderer deliberately validates exactly one Seedstone or moon, one deterministic hazard and one Worldheart. A launch node may follow the same authored deterministic orbit contract as a hazard: prediction samples its future collision position, live flight samples the identical fixed step, and an attached seed rides the body until launch. Additional simultaneous small bodies require a deliberate renderer generalisation; invisible collision bodies are never acceptable.
 
 Broken Belt uses merged surface landmarks for final low-cost worlds: Relay's signal rings, Kiln's vent crown, Loom's linked arches, Shard's crystal crown, Drift's wave crests and Vault's protective ribs all share their planet surface draw call and grow through the same restoration wave. This is an authored visual tier, not greybox content; First Light's three multi-mesh dioramas remain the premium close-up benchmark.
+
+Wandering Garden uses the same one-call restoration tier without reusing the Belt's silhouettes: Bower's sheltering arches, Lantern's flower lamps, Canopy's clustered treetops, Crown's oversized petals, Dew's droplets and Nest's woven ribs establish a softer living system. The Pollen Moon adds a cyan orbit guide and moves its attached seed in fixed simulation time, making the chapter's spatial problem visible before the player commits.
 
 A new system should therefore require one data definition plus deliberately registered visual factories. It must not require a second physics implementation, per-system branches throughout the game loop or duplicated prediction logic. First Light is the behavioural compatibility fixture for this contract.
 
@@ -150,6 +152,8 @@ Example awakening lines:
 - Frost: “Under the ice, the old ocean was still dreaming.”
 
 Broken Belt's fragments reveal a system that continued trying to communicate after it broke: its relay kept calling, its bridges remembered their neighbours, the furnaces guarded one coal and the Shard preserved a map in every face. Reconnecting the Belt Heart turns those separate memories into the first signal pointing beyond First Light.
+
+Wandering Garden answers that signal with movement rather than machinery. Its shelter saved one leaf, its lamp-flower opens to the void, its branches remember rain and its smallest Nest keeps a place for travellers. Reconnecting the Garden Heart sends the first living pulse toward the Long Night.
 
 The campaign premise is simple:
 

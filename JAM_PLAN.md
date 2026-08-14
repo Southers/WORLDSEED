@@ -85,6 +85,8 @@ Exit: the campaign sustains choice, mastery and emotional progression across mul
 
 Progression checkpoint: First Light's Worldheart summary now offers an explicit continuation into Broken Belt, while the current campaign frontier offers a chapter replay. Both use the same authored-system registry and URL entry path, so direct chapter links, recovery and browser smoke tests remain available without a second game loop. Wandering Garden and Long Night content remain the next checkpoints.
 
+Wandering Garden checkpoint: the campaign now continues from Broken Belt into a six-world living system—Bower, Lantern, Canopy, Crown, Dew and Nest—with distinct one-call silhouettes and awakening memories. Its Pollen Moon is a true deterministic moving launch node: the trusted preview and live flight meet it on the same fixed step, an attached seed rides its orbit, aiming refreshes as the launch origin moves, and the moon disappears after its one launch. Thornwing creates a second readable moving risk, while three awakenings open the physical Garden Heart. Deterministic tests cover both opening branches and a timed Canopy-to-Moon route. Desktop proved Lantern and Moon landings; a 390×844 run proved timed Bower → Pollen Moon → Nest, Thornwing impact/recovery, close-pass feedback, alternate routing, three awakenings and Garden Heart completion with a clean console. Long Night remains the next campaign checkpoint.
+
 ## Milestone 7 — Worldheart finale, polish and submission readiness
 
 - Build a final system that recombines the established route vocabulary.

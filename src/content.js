@@ -185,17 +185,20 @@ export function validateAuthoredSystemDefinition(SystemDefinition) {
     if (!(BodyDefinition.radius > 0)) {
       Errors.push(`Tactical body ${BodyDefinition.id ?? '<unknown>'} requires a positive radius.`);
     }
-    if (BodyDefinition.kind === 'hazard') {
-      if (
-        !BodyDefinition.orbit
-        || !isFiniteVector(BodyDefinition.orbit.centre)
-        || !(BodyDefinition.orbit.radius > 0)
-        || !Number.isFinite(BodyDefinition.orbit.phaseRadians)
-        || !Number.isFinite(BodyDefinition.orbit.angularSpeedRadiansPerSecond)
-      ) {
-        Errors.push(`Hazard ${BodyDefinition.id ?? '<unknown>'} requires a deterministic orbit.`);
-      }
-    } else if (!isFiniteVector(BodyDefinition.position)) {
+    if (BodyDefinition.orbit && (
+      !isFiniteVector(BodyDefinition.orbit.centre)
+      || !(BodyDefinition.orbit.radius > 0)
+      || !Number.isFinite(BodyDefinition.orbit.phaseRadians)
+      || !Number.isFinite(BodyDefinition.orbit.angularSpeedRadiansPerSecond)
+    )) {
+      Errors.push(
+        `Tactical body ${BodyDefinition.id ?? '<unknown>'} has an invalid deterministic orbit.`,
+      );
+    }
+    if (BodyDefinition.kind === 'hazard' && !BodyDefinition.orbit) {
+      Errors.push(`Hazard ${BodyDefinition.id ?? '<unknown>'} requires a deterministic orbit.`);
+    }
+    if (BodyDefinition.kind !== 'hazard' && !isFiniteVector(BodyDefinition.position)) {
       Errors.push(`Tactical body ${BodyDefinition.id ?? '<unknown>'} requires a finite position.`);
     }
     if (BodyDefinition.kind === 'seedstone' && !(BodyDefinition.uses > 0)) {
@@ -642,16 +645,166 @@ export const BrokenBeltSystemDefinition = {
   ],
 };
 
+/** A living system whose useful routes open and close as its small bodies move. */
+export const WanderingGardenSystemDefinition = {
+  id: 'wandering-garden',
+  label: 'WANDERING GARDEN',
+  openingBody: 'The Garden is still turning. Wake a path, then ride its little moon into bloom.',
+  completion: {
+    eyebrow: 'THE GARDEN TURNS AGAIN',
+    title: 'Life has learned to move with the dark.',
+    perfectTitle: 'Every wandering root has found the light.',
+    body: 'The Garden Heart sends a green pulse toward the long night ahead.',
+    perfectBody: 'Every world and every moonlit arc now flowers in the living constellation.',
+  },
+  constellation: {
+    nodes: [
+      { id: 'bower', label: 'Bower', x: 22, y: 72 },
+      { id: 'canopy', label: 'Canopy', x: 58, y: 34 },
+      { id: 'crown', label: 'Crown', x: 112, y: 16 },
+      { id: 'dew', label: 'Dew', x: 174, y: 30 },
+      { id: 'lantern', label: 'Lantern', x: 112, y: 72 },
+      { id: 'nest', label: 'Nest', x: 104, y: 45 },
+      { id: 'garden-heart', label: 'Garden Heart', x: 216, y: 68, isHeart: true },
+    ],
+    edges: [
+      ['bower', 'canopy'], ['bower', 'lantern'], ['canopy', 'crown'],
+      ['canopy', 'nest'], ['lantern', 'nest'], ['lantern', 'dew'],
+      ['nest', 'crown'], ['nest', 'dew'], ['crown', 'dew'],
+      ['crown', 'garden-heart'], ['dew', 'garden-heart'],
+    ],
+  },
+  startingWorldIdentifier: 'bower',
+  openingGuideTargetIdentifier: 'lantern',
+  worldheartUnlockThreshold: 3,
+  routeSuggestions: {
+    bower: ['canopy', 'lantern'],
+    canopy: ['pollen-moon', 'crown', 'nest', 'lantern'],
+    lantern: ['pollen-moon', 'dew', 'nest', 'canopy'],
+    nest: ['garden-heart', 'crown', 'dew', 'canopy'],
+    crown: ['garden-heart', 'dew', 'canopy', 'nest'],
+    dew: ['garden-heart', 'crown', 'lantern', 'nest'],
+    'pollen-moon': ['crown', 'nest', 'dew', 'lantern'],
+  },
+  worlds: [
+    {
+      id: 'bower', label: 'BOWER', visualKey: 'bower',
+      position: { x: -8, y: -6.4, z: 0 }, radius: 3.35, gravitationalParameter: 92,
+      aliveColor: 0x4f9870, atmosphereColor: 0x9ce6b2, accentColor: 0xf2e69a,
+      initiallyRestored: true, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'The first shelter had kept one leaf warm.',
+      restoration: {
+        durationSeconds: 2.2, waveWidth: 0.045, growthTrailWidth: 0.18,
+        waveColor: 0xe8ffc0, atmosphereOpacity: 0, rotationSpeed: 0.00045,
+        surfaceVariation: 0.1,
+      },
+    },
+    {
+      id: 'lantern', label: 'LANTERN', visualKey: 'lantern',
+      position: { x: 7.8, y: -3.3, z: 0 }, radius: 3, gravitationalParameter: 82,
+      aliveColor: 0xa88a45, atmosphereColor: 0xffe895, accentColor: 0xfff2b6,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'A patient flower opened its lamp to the void.',
+      restoration: {
+        durationSeconds: 2.3, waveWidth: 0.048, growthTrailWidth: 0.18,
+        waveColor: 0xffefad, atmosphereOpacity: 0, rotationSpeed: 0.00105,
+        surfaceVariation: 0.05,
+      },
+    },
+    {
+      id: 'canopy', label: 'CANOPY', visualKey: 'canopy',
+      position: { x: -8.8, y: 3, z: 0 }, radius: 2.05, gravitationalParameter: 44,
+      aliveColor: 0x5b9c73, atmosphereColor: 0xb6e8bd, accentColor: 0xe6f39b,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'Its branches bent together, remembering the shape of rain.',
+      restoration: {
+        durationSeconds: 1.9, waveWidth: 0.055, growthTrailWidth: 0.2,
+        waveColor: 0xddffb7, atmosphereOpacity: 0, rotationSpeed: 0.00068,
+        surfaceVariation: 0.09,
+      },
+    },
+    {
+      id: 'crown', label: 'CROWN', visualKey: 'crown',
+      position: { x: 0.7, y: 8, z: 0 }, radius: 3.55, gravitationalParameter: 102,
+      aliveColor: 0x8160a4, atmosphereColor: 0xd7b8ef, accentColor: 0xffc5ec,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'The old crown bloomed only when the moon passed close.',
+      restoration: {
+        durationSeconds: 2.55, waveWidth: 0.042, growthTrailWidth: 0.2,
+        waveColor: 0xf6c8ff, atmosphereOpacity: 0, rotationSpeed: 0.0009,
+        surfaceVariation: 0.04,
+      },
+    },
+    {
+      id: 'dew', label: 'DEW', visualKey: 'dew',
+      position: { x: 9.7, y: 6, z: 0 }, radius: 2.15, gravitationalParameter: 48,
+      aliveColor: 0x3d8f91, atmosphereColor: 0x9ff4dc, accentColor: 0xc2ffef,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'One clear drop still held the reflection of a blue sky.',
+      restoration: {
+        durationSeconds: 1.95, waveWidth: 0.052, growthTrailWidth: 0.2,
+        waveColor: 0xb9ffe7, atmosphereOpacity: 0, rotationSpeed: 0.00082,
+        surfaceVariation: 0.06,
+      },
+    },
+    {
+      id: 'nest', label: 'NEST', visualKey: 'nest',
+      position: { x: 3.5, y: 1, z: 0 }, radius: 1.45, gravitationalParameter: 18,
+      aliveColor: 0x8b704c, atmosphereColor: 0xe8cf9b, accentColor: 0xb8e58c,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'The smallest world had saved a place for every traveller.',
+      restoration: {
+        durationSeconds: 1.7, waveWidth: 0.06, growthTrailWidth: 0.22,
+        waveColor: 0xf4e4aa, atmosphereOpacity: 0, rotationSpeed: 0.00055,
+        surfaceVariation: 0.07,
+      },
+    },
+  ],
+  tacticalBodies: [
+    {
+      id: 'pollen-moon', label: 'POLLEN MOON', kind: 'seedstone',
+      position: { x: 0.5, y: -0.6, z: 0 }, radius: 0.72, uses: 1,
+      countsTowardRestoration: false, isRouteDestination: true,
+      routeAvailableInitially: true,
+      orbit: {
+        centre: { x: 3.5, y: 1, z: 0 }, radius: 3.4,
+        phaseRadians: -2.65, angularSpeedRadiansPerSecond: 0.18,
+      },
+    },
+    {
+      id: 'thornwing', label: 'THORNWING', kind: 'hazard', radius: 0.66,
+      countsTowardRestoration: false,
+      orbit: {
+        centre: { x: 0.7, y: 8, z: 0 }, radius: 5.35,
+        phaseRadians: -0.9, angularSpeedRadiansPerSecond: 0.28,
+      },
+    },
+    {
+      id: 'garden-heart', label: 'GARDEN HEART', kind: 'worldheart',
+      position: { x: -4.35, y: 8.75, z: 0 }, radius: 0.9,
+      initiallyRestored: false, countsTowardRestoration: false,
+      isRouteDestination: true, routeAvailableInitially: false,
+    },
+  ],
+  stardust: [
+    { id: 'wandering-garden-arc-1', position: { x: -4.9, y: -3.7, z: 0 } },
+    { id: 'wandering-garden-arc-2', position: { x: -5.7, y: -2.25, z: 0 } },
+    { id: 'wandering-garden-arc-3', position: { x: -6.5, y: -0.9, z: 0 } },
+  ],
+};
+
 export const DefaultAuthoredSystemIdentifier = FirstLightSystemDefinition.id;
 
 export const AuthoredSystemDefinitions = {
   [FirstLightSystemDefinition.id]: FirstLightSystemDefinition,
   [BrokenBeltSystemDefinition.id]: BrokenBeltSystemDefinition,
+  [WanderingGardenSystemDefinition.id]: WanderingGardenSystemDefinition,
 };
 
 export const AuthoredCampaignSystemIdentifiers = [
   FirstLightSystemDefinition.id,
   BrokenBeltSystemDefinition.id,
+  WanderingGardenSystemDefinition.id,
 ];
 
 /** Resolves a requested authored system and safely falls back to the campaign entry. */
