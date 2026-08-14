@@ -166,3 +166,15 @@ export function getTrajectoryPickupIdentifiers(
 
   return CollectedPickupIdentifiers;
 }
+
+/** Rolls back only pickups touched during a failed shot, preserving earlier banked mastery. */
+export function rollbackFlightPickups(PickupDefinitions, FlightPickupIdentifiers) {
+  let RestoredPickupCount = 0;
+  for (const PickupDefinition of PickupDefinitions) {
+    if (FlightPickupIdentifiers.has(PickupDefinition.id) && PickupDefinition.collected) {
+      PickupDefinition.collected = false;
+      RestoredPickupCount += 1;
+    }
+  }
+  return RestoredPickupCount;
+}

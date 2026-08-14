@@ -9,6 +9,7 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
+  rollbackFlightPickups,
 } from '../src/campaign.js';
 
 function createFirstLightDefinitions() {
@@ -201,5 +202,22 @@ test('trajectory pickup prediction reports each uncollected mote once', () => {
   assert.deepEqual(
     getTrajectoryPickupIdentifiers(TrajectoryPoints, PickupDefinitions, 0.2).sort(),
     ['arc-1', 'arc-3'],
+  );
+});
+
+test('failed-flight rollback preserves earlier banked stardust', () => {
+  const PickupDefinitions = [
+    { id: 'banked', collected: true },
+    { id: 'flight-1', collected: true },
+    { id: 'flight-2', collected: true },
+  ];
+
+  assert.equal(
+    rollbackFlightPickups(PickupDefinitions, new Set(['flight-1', 'flight-2'])),
+    2,
+  );
+  assert.deepEqual(
+    PickupDefinitions.map((PickupDefinition) => PickupDefinition.collected),
+    [true, false, false],
   );
 });

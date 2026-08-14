@@ -14,6 +14,7 @@ The authored chapters can also be selected directly for development and replay:
 
 - **Broken Belt:** https://southers.github.io/WORLDSEED/?system=broken-belt
 - **Wandering Garden:** https://southers.github.io/WORLDSEED/?system=wandering-garden
+- **The Long Night:** https://southers.github.io/WORLDSEED/?system=long-night
 
 ### Release smoke test
 
@@ -43,6 +44,8 @@ The current build includes:
 - a selectable six-world Broken Belt chapter with Relay/Kiln/Loom/Shard/Drift/Vault routes, a tactical Splinter, the orbiting Sentinel and a physical Belt Heart exit;
 - a selectable six-world Wandering Garden chapter with a deterministic orbiting Pollen Moon that carries the attached seed, a moving Thornwing hazard and a physical Garden Heart exit;
 - six new low-cost Garden silhouettes—sheltering arches, flower lamps, clustered treetops, giant petals, droplets and woven ribs—restored through the existing planet-wrapping wave;
+- a selectable six-world Long Night chapter with heavier gravity wells, longer routes, an authored dark lighting palette, deterministic Eclipse timing and a four-world Night Heart gate;
+- six Long Night silhouettes—watchfires, swept flames, empty bells, star rays, crescents and a prism—merged into their restoration surfaces;
 - six low-cost authored silhouettes whose signal rings, vents, linked arches, crystal crown, wave crests and vault ribs grow inside the same one-call restoration surface;
 - two suggested route choices with world-space HUD labels and a single instanced beacon draw call;
 - persistent restored launch nodes, so landing order changes the next useful geometry;
@@ -51,6 +54,7 @@ The current build includes:
 - a deterministic asteroid on a visible authored orbit, sampled at the same future fixed steps by prediction and live flight;
 - red predicted-collision feedback plus fast `ASTEROID IMPACT` recovery;
 - a three-pickup Meadow-to-Frost Arc whose motes turn gold under a matching prediction and persist as `ARC 3 / 3` mastery for the run;
+- provisional flight pickups that bank only on a valid landing, so crashing after an Arc restores that shot's motes instead of awarding failed mastery;
 - a compact three-world Worldheart threshold, gold physical exit shot and honest Heart/Bloom/Arc completion summary;
 - a concise awakening memory for every world, shown inside the existing restoration flow without pausing control;
 - deterministic `CLOSE PASS`, `GRAVITY ASSIST` and `CLEAN LANDING` accolades derived from the successful live flight;
@@ -78,7 +82,9 @@ Broken Belt is the first content-pipeline chapter. Relay opens toward the safe d
 
 Wandering Garden is the first moving-launch chapter. Bower again opens with two immediately legible worlds, but the orbiting Pollen Moon periodically crosses useful trajectories. Landing on it does not increase world progress: instead the seed rides the cyan orbit until the player chooses a changing launch angle, after which the moon crumbles. Thornwing guards the Crown side of the Garden and rewards waiting or changing destination. Three awakenings open the Garden Heart while two worlds remain optional for Bloom. Browser evidence covers the desktop Bower → Lantern → Pollen Moon interaction and a complete 390×844 timed Pollen Moon → Nest → Crown → Canopy → Garden Heart run, including hazard recovery and close-pass feedback, with no console warnings or errors.
 
-Completing First Light offers **Continue to BROKEN BELT**, and completing Broken Belt offers **Continue to WANDERING GARDEN**. The current frontier offers **Replay WANDERING GARDEN**, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
+Long Night escalates through route geometry instead of a new verb. Vigil offers the readable Pyre line or the much longer Hollow commitment; an optional three-mote arc bends all the way into Beacon, but Eclipse makes the immediate prediction red until its deterministic orbit clears. The chapter requires four awakenings before the Night Heart route opens and banks Arc motes only after survival. Browser evidence covers both desktop openings, the blocked and cleared full Arc, and a complete 390×844 Vigil → Pyre → Umbra → Beacon → Hollow → Night Heart run with failure recovery, close-pass feedback, Replay reset, 20 peak draw calls and no console warnings or errors.
+
+Completing First Light offers **Continue to BROKEN BELT**, Broken Belt offers **Continue to WANDERING GARDEN**, and the Garden offers **Continue to THE LONG NIGHT**. The current frontier offers **Replay THE LONG NIGHT**, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
 
 ### Visual budget
 

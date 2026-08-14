@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7n';
+import { WorldseedAudio } from './audio.js?v=20260814-7q';
 
 import {
   DefaultAuthoredSystemIdentifier,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
   getNextAuthoredSystemIdentifier,
-} from './content.js?v=20260814-7n';
+} from './content.js?v=20260814-7q';
 
 import {
   countRestoredWorlds,
@@ -18,7 +18,8 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260814-7n';
+  rollbackFlightPickups,
+} from './campaign.js?v=20260814-7q';
 
 import {
   calculateBodyPositionAtTime,
@@ -28,12 +29,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7n';
+} from './physics.js?v=20260814-7q';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7n';
+} from './restoration.js?v=20260814-7q';
 
 const RequestedSystemIdentifier = new URLSearchParams(window.location.search).get('system')
   ?? DefaultAuthoredSystemIdentifier;
@@ -101,7 +102,7 @@ const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
 configureSystemInterface();
-GameCanvas.dataset.build = '20260814-7n';
+GameCanvas.dataset.build = '20260814-7q';
 GameCanvas.dataset.system = ActiveSystem.id;
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
@@ -124,8 +125,11 @@ const WorldClosePassClearance = 1.35;
 const AsteroidClosePassClearance = 1.05;
 
 const Scene = new THREE.Scene();
-Scene.background = new THREE.Color(0x06101a);
-Scene.fog = new THREE.FogExp2(0x06101a, 0.012);
+Scene.background = ActiveSystem.environment.backgroundColor;
+Scene.fog = new THREE.FogExp2(
+  ActiveSystem.environment.fogColor,
+  ActiveSystem.environment.fogDensity,
+);
 
 const Renderer = new THREE.WebGLRenderer({
   canvas: GameCanvas,
@@ -135,7 +139,7 @@ const Renderer = new THREE.WebGLRenderer({
 });
 Renderer.outputColorSpace = THREE.SRGBColorSpace;
 Renderer.toneMapping = THREE.ACESFilmicToneMapping;
-Renderer.toneMappingExposure = 1.15;
+Renderer.toneMappingExposure = ActiveSystem.environment.toneMappingExposure;
 Renderer.shadowMap.enabled = true;
 Renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -188,6 +192,7 @@ let SeedstoneCrumbleStartedAtSeconds = null;
 let AttachedSeedstoneSurfaceOffset = null;
 let WorldheartJustUnlocked = false;
 let PredictedStardustIdentifiers = new Set();
+const FlightCollectedStardustIdentifiers = new Set();
 let FlightOriginWorldIdentifier = null;
 let FlightHadAsteroidClosePass = false;
 const FlightClosePassWorldIdentifiers = new Set();
@@ -260,10 +265,14 @@ function configureSystemInterface() {
  * more authored lighting rig without changing gameplay code.
  */
 function createLighting() {
-  const HemisphereLight = new THREE.HemisphereLight(0xa9c6d8, 0x17212a, 1.55);
+  const HemisphereLight = new THREE.HemisphereLight(
+    ActiveSystem.environment.hemisphereSkyColor,
+    ActiveSystem.environment.hemisphereGroundColor,
+    1.55,
+  );
   Scene.add(HemisphereLight);
 
-  const KeyLight = new THREE.DirectionalLight(0xfff4dc, 3.2);
+  const KeyLight = new THREE.DirectionalLight(ActiveSystem.environment.keyLightColor, 3.2);
   KeyLight.position.set(-12, 18, 24);
   KeyLight.castShadow = true;
   KeyLight.shadow.mapSize.set(1024, 1024);
@@ -277,11 +286,11 @@ function createLighting() {
   KeyLight.shadow.normalBias = 0.035;
   Scene.add(KeyLight);
 
-  const FillLight = new THREE.DirectionalLight(0x7aa3d1, 1.0);
+  const FillLight = new THREE.DirectionalLight(ActiveSystem.environment.fillLightColor, 1.0);
   FillLight.position.set(18, -10, 14);
   Scene.add(FillLight);
 
-  const RimLight = new THREE.DirectionalLight(0x83d7ff, 1.15);
+  const RimLight = new THREE.DirectionalLight(ActiveSystem.environment.rimLightColor, 1.15);
   RimLight.position.set(8, 12, -18);
   Scene.add(RimLight);
 }
@@ -1153,6 +1162,170 @@ function createNestSurfaceGeometry(WorldDefinition) {
   return mergeRestorationGeometries(Geometries);
 }
 
+/** Builds Vigil's ring of stubborn watchtowers into one restorable surface. */
+function createVigilSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const TowerSource = new THREE.CylinderGeometry(0.18, 0.28, 0.92, 6);
+  TowerSource.translate(0, 0.46, 0);
+  const FlameSource = new THREE.ConeGeometry(0.18, 0.48, 6);
+  FlameSource.translate(0, 1.03, 0);
+  const TowerDirections = [
+    new THREE.Vector3(-0.56, 0.3, 0.8),
+    new THREE.Vector3(-0.12, 0.62, 0.8),
+    new THREE.Vector3(0.42, 0.46, 0.82),
+    new THREE.Vector3(0.58, -0.12, 0.84),
+    new THREE.Vector3(0.08, -0.5, 0.88),
+    new THREE.Vector3(-0.44, -0.3, 0.88),
+  ];
+  TowerDirections.forEach((TowerDirection, TowerIndex) => {
+    const TowerScale = 0.82 + ((TowerIndex % 3) * 0.12);
+    Geometries.push(createPlacedLandmarkGeometry(
+      TowerSource, TowerDirection, WorldDefinition.radius, TowerScale, TowerIndex * 0.58,
+    ));
+    Geometries.push(createPlacedLandmarkGeometry(
+      FlameSource, TowerDirection, WorldDefinition.radius, TowerScale, TowerIndex * 0.58,
+    ));
+  });
+  TowerSource.dispose();
+  FlameSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Pyre's swept flame crown as a single low-cost silhouette. */
+function createPyreSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const FlameSource = new THREE.ConeGeometry(0.34, 1.42, 6);
+  FlameSource.translate(0, 0.71, 0);
+  FlameSource.rotateZ(-0.14);
+  const FlameDirections = [
+    new THREE.Vector3(-0.52, 0.36, 0.82),
+    new THREE.Vector3(-0.12, 0.66, 0.78),
+    new THREE.Vector3(0.34, 0.54, 0.8),
+    new THREE.Vector3(0.62, 0.08, 0.82),
+    new THREE.Vector3(0.3, -0.42, 0.88),
+    new THREE.Vector3(-0.3, -0.42, 0.88),
+  ];
+  FlameDirections.forEach((FlameDirection, FlameIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      FlameSource,
+      FlameDirection,
+      WorldDefinition.radius - 0.05,
+      0.76 + ((FlameIndex % 3) * 0.16),
+      FlameIndex * 0.7,
+    ));
+  });
+  FlameSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Hollow's empty bell arches around its quiet surface. */
+function createHollowSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const BellSource = new THREE.ConeGeometry(0.42, 0.68, 8, 1, true);
+  BellSource.translate(0, 0.4, 0);
+  const ArchSource = new THREE.TorusGeometry(0.62, 0.09, 5, 18, Math.PI);
+  const BellYaws = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
+  BellYaws.forEach((BellYaw, BellIndex) => {
+    Geometries.push(createFrontLandmarkGeometry(
+      ArchSource,
+      WorldDefinition.radius + 0.06,
+      0,
+      -0.12,
+      0.88,
+      BellIndex % 2 === 0 ? -0.08 : 0.08,
+      BellYaw,
+    ));
+    Geometries.push(createFrontLandmarkGeometry(
+      BellSource,
+      WorldDefinition.radius + 0.08,
+      0,
+      0.18,
+      0.82,
+      Math.PI,
+      BellYaw,
+    ));
+  });
+  BellSource.dispose();
+  ArchSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Beacon's radial star fins into its planet-wrapping restoration surface. */
+function createBeaconSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const RaySource = new THREE.ConeGeometry(0.24, 1.62, 5);
+  RaySource.translate(0, 0.81, 0);
+  const RayDirections = [
+    new THREE.Vector3(-0.62, 0.22, 0.78),
+    new THREE.Vector3(-0.32, 0.58, 0.78),
+    new THREE.Vector3(0.12, 0.68, 0.76),
+    new THREE.Vector3(0.5, 0.42, 0.8),
+    new THREE.Vector3(0.64, -0.06, 0.8),
+    new THREE.Vector3(0.34, -0.48, 0.84),
+    new THREE.Vector3(-0.1, -0.56, 0.86),
+    new THREE.Vector3(-0.52, -0.3, 0.82),
+  ];
+  RayDirections.forEach((RayDirection, RayIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      RaySource,
+      RayDirection,
+      WorldDefinition.radius - 0.1,
+      0.8 + ((RayIndex % 2) * 0.16),
+      RayIndex * 0.72,
+    ));
+  });
+  RaySource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Umbra's offset crescent ribs as a readable shadow-world silhouette. */
+function createUmbraSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const CrescentSource = new THREE.TorusGeometry(0.82, 0.12, 5, 22, Math.PI * 1.35);
+  [0, Math.PI * 0.66, Math.PI * 1.32].forEach((CrescentYaw, CrescentIndex) => {
+    Geometries.push(createFrontLandmarkGeometry(
+      CrescentSource,
+      WorldDefinition.radius + 0.1,
+      -0.16,
+      -0.08,
+      0.94 + (CrescentIndex * 0.05),
+      -0.34 + (CrescentIndex * 0.22),
+      CrescentYaw,
+    ));
+  });
+  CrescentSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Lumen's compact star prism and protective halo in one draw call. */
+function createLumenSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const PrismSource = new THREE.OctahedronGeometry(0.58, 0);
+  PrismSource.scale(0.72, 1.5, 0.72);
+  PrismSource.translate(0, 0.72, 0);
+  const HaloSource = new THREE.TorusGeometry(0.72, 0.08, 5, 22);
+  const PrismDirections = [
+    new THREE.Vector3(-0.42, 0.34, 0.88),
+    new THREE.Vector3(0.38, 0.38, 0.88),
+    new THREE.Vector3(0, -0.42, 0.92),
+  ];
+  PrismDirections.forEach((PrismDirection, PrismIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      PrismSource,
+      PrismDirection,
+      WorldDefinition.radius - 0.04,
+      0.78 + (PrismIndex * 0.1),
+      PrismIndex * 0.8,
+    ));
+  });
+  Geometries.push(createFrontLandmarkGeometry(
+    HaloSource, WorldDefinition.radius + 0.16, 0, 0, 0.92, 0.18,
+  ));
+  PrismSource.dispose();
+  HaloSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
 /** Selects one-call authored geometry for lightweight route worlds. */
 function createMergedSurfaceGeometry(WorldDefinition) {
   const MergedGeometryFactories = {
@@ -1170,6 +1343,12 @@ function createMergedSurfaceGeometry(WorldDefinition) {
     crown: createCrownSurfaceGeometry,
     dew: createDewSurfaceGeometry,
     nest: createNestSurfaceGeometry,
+    vigil: createVigilSurfaceGeometry,
+    pyre: createPyreSurfaceGeometry,
+    hollow: createHollowSurfaceGeometry,
+    beacon: createBeaconSurfaceGeometry,
+    umbra: createUmbraSurfaceGeometry,
+    lumen: createLumenSurfaceGeometry,
   };
   return (
     MergedGeometryFactories[WorldDefinition.visualKey]
@@ -2616,6 +2795,7 @@ function collectStardustAtPosition(SeedPosition) {
     }
 
     StardustDefinition.collected = true;
+    FlightCollectedStardustIdentifiers.add(StardustDefinition.id);
     NewlyCollectedCount += 1;
   }
 
@@ -2632,13 +2812,28 @@ function collectStardustAtPosition(SeedPosition) {
     StardustDefinitions.length,
   );
   if (CollectedStardustCount === StardustDefinitions.length) {
-    showStatusToast('ARC COMPLETE · 3 / 3', 1200);
+    showStatusToast('ARC +3 · LAND TO BANK', 1200);
   } else {
     showStatusToast(
       `STARDUST ${CollectedStardustCount} / ${StardustDefinitions.length}`,
       620,
     );
   }
+}
+
+/** Commits pickups only when the current shot reaches a valid landing. */
+function commitFlightStardust() {
+  FlightCollectedStardustIdentifiers.clear();
+}
+
+/** Restores pickups touched during a failed flight so Arc mastery requires survival. */
+function rollbackFlightStardust() {
+  if (FlightCollectedStardustIdentifiers.size === 0) {
+    return;
+  }
+  rollbackFlightPickups(StardustDefinitions, FlightCollectedStardustIdentifiers);
+  FlightCollectedStardustIdentifiers.clear();
+  updateStardustCounter();
 }
 
 /** Animates uncollected motes and brightens those intersected by the current prediction. */
@@ -2909,6 +3104,7 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
     !WasAlreadyRestored,
   );
   GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
+  commitFlightStardust();
   resetFlightFeedback();
   restoreWorld(WorldDefinition, ImpactPosition);
 
@@ -2959,6 +3155,7 @@ function attachSeedToSeedstone(ImpactPosition, BodyPosition) {
   LaunchIgnoredBodyIdentifier = null;
   GamePhase = 'attached';
   GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
+  commitFlightStardust();
   resetFlightFeedback();
   showStatusToast(
     LandingAccolade
@@ -2996,6 +3193,7 @@ function attachSeedToWorldheart(ImpactPosition) {
   publishAttachedSeedState(CurrentWorldIdentifier, SurfaceRestPosition);
   WorldheartDefinition.restored = true;
   GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
+  commitFlightStardust();
   resetFlightFeedback();
   GamePhase = 'victoryPending';
   updateWorldheartObjective();
@@ -3345,6 +3543,7 @@ function handlePointerUp(PointerEventData) {
   );
   const IsLaunchingFromSeedstone = CurrentWorldIdentifier === SeedstoneDefinition.id;
   FlightOriginWorldIdentifier = IsLaunchingFromSeedstone ? null : CurrentWorldIdentifier;
+  FlightCollectedStardustIdentifiers.clear();
   FlightHadAsteroidClosePass = false;
   FlightClosePassWorldIdentifiers.clear();
   LaunchIgnoredWorldIdentifier = IsLaunchingFromSeedstone ? null : CurrentWorldIdentifier;
@@ -3382,6 +3581,7 @@ function recoverSeedFromVoid(StatusMessage = 'LOST TO THE VOID') {
   }
 
   GamePhase = 'recovering';
+  rollbackFlightStardust();
   resetFlightFeedback();
   SeedPhysicsState.velocity = createVector();
   WorldseedSound.failure();
@@ -4044,6 +4244,7 @@ function resetGame() {
     StardustDefinition.collected = false;
   }
   PredictedStardustIdentifiers.clear();
+  FlightCollectedStardustIdentifiers.clear();
   GamePhase = 'attached';
   PhysicsAccumulatorSeconds = 0;
   PhysicsElapsedTimeSeconds = 0;

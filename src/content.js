@@ -14,6 +14,17 @@ const RequiredRestorationNumbers = [
   'surfaceVariation',
 ];
 const SupportedTacticalBodyKinds = new Set(['seedstone', 'hazard', 'worldheart']);
+const DefaultEnvironmentDefinition = {
+  backgroundColor: 0x06101a,
+  fogColor: 0x06101a,
+  fogDensity: 0.012,
+  hemisphereSkyColor: 0xa9c6d8,
+  hemisphereGroundColor: 0x17212a,
+  keyLightColor: 0xfff4dc,
+  fillLightColor: 0x7aa3d1,
+  rimLightColor: 0x83d7ff,
+  toneMappingExposure: 1.15,
+};
 
 function isFiniteVector(VectorValue) {
   return VectorValue
@@ -54,6 +65,24 @@ export function validateAuthoredSystemDefinition(SystemDefinition) {
   }
   if (!SystemDefinition.openingBody || typeof SystemDefinition.openingBody !== 'string') {
     Errors.push('Authored system requires openingBody story copy.');
+  }
+  if (SystemDefinition.environment) {
+    for (const ColorField of [
+      'backgroundColor', 'fogColor', 'hemisphereSkyColor', 'hemisphereGroundColor',
+      'keyLightColor', 'fillLightColor', 'rimLightColor',
+    ]) {
+      if (!isColorValue(SystemDefinition.environment[ColorField])) {
+        Errors.push(`Authored system environment.${ColorField} requires a colour integer.`);
+      }
+    }
+    if (
+      !(SystemDefinition.environment.fogDensity >= 0)
+      || !(SystemDefinition.environment.fogDensity <= 0.05)
+      || !(SystemDefinition.environment.toneMappingExposure > 0.5)
+      || !(SystemDefinition.environment.toneMappingExposure <= 2)
+    ) {
+      Errors.push('Authored system environment has invalid fog or exposure ranges.');
+    }
   }
   const CompletionDefinition = SystemDefinition.completion;
   for (const CompletionField of [
@@ -347,11 +376,25 @@ export function createAuthoredSystemRuntime(
     restored: BodyDefinition.initiallyRestored === true,
     routeAvailable: BodyDefinition.routeAvailableInitially === true,
   }));
+  const EnvironmentDefinition = {
+    ...DefaultEnvironmentDefinition,
+    ...SystemDefinition.environment,
+  };
 
   return {
     id: SystemDefinition.id,
     label: SystemDefinition.label,
     openingBody: SystemDefinition.openingBody,
+    environment: {
+      ...EnvironmentDefinition,
+      backgroundColor: createColor(EnvironmentDefinition.backgroundColor),
+      fogColor: createColor(EnvironmentDefinition.fogColor),
+      hemisphereSkyColor: createColor(EnvironmentDefinition.hemisphereSkyColor),
+      hemisphereGroundColor: createColor(EnvironmentDefinition.hemisphereGroundColor),
+      keyLightColor: createColor(EnvironmentDefinition.keyLightColor),
+      fillLightColor: createColor(EnvironmentDefinition.fillLightColor),
+      rimLightColor: createColor(EnvironmentDefinition.rimLightColor),
+    },
     completion: { ...SystemDefinition.completion },
     constellation: {
       nodes: SystemDefinition.constellation.nodes.map((NodeDefinition) => ({
@@ -793,18 +836,174 @@ export const WanderingGardenSystemDefinition = {
   ],
 };
 
+/** The campaign's deepest authored system, built around long assists and narrow clearings. */
+export const LongNightSystemDefinition = {
+  id: 'long-night',
+  label: 'THE LONG NIGHT',
+  openingBody: 'Dawn is gone here. Carry the Garden\'s green pulse through the longest dark.',
+  environment: {
+    backgroundColor: 0x02030b,
+    fogColor: 0x030411,
+    fogDensity: 0.014,
+    hemisphereSkyColor: 0x59617f,
+    hemisphereGroundColor: 0x090914,
+    keyLightColor: 0xd9dbff,
+    fillLightColor: 0x574c91,
+    rimLightColor: 0x8a93ff,
+    toneMappingExposure: 1.08,
+  },
+  completion: {
+    eyebrow: 'THE LONG NIGHT BREAKS',
+    title: 'A road to the Worldheart burns beyond the dark.',
+    perfectTitle: 'Every watchfire carries the coming dawn.',
+    body: 'The forgotten systems now point together toward the Worldheart.',
+    perfectBody: 'Every world and every long arc now burns in one unbroken constellation.',
+  },
+  constellation: {
+    nodes: [
+      { id: 'vigil', label: 'Vigil', x: 22, y: 72 },
+      { id: 'hollow', label: 'Hollow', x: 56, y: 34 },
+      { id: 'beacon', label: 'Beacon', x: 112, y: 14 },
+      { id: 'umbra', label: 'Umbra', x: 178, y: 28 },
+      { id: 'pyre', label: 'Pyre', x: 112, y: 72 },
+      { id: 'lumen', label: 'Lumen', x: 108, y: 46 },
+      { id: 'night-heart', label: 'Night Heart', x: 216, y: 68, isHeart: true },
+    ],
+    edges: [
+      ['vigil', 'hollow'], ['vigil', 'pyre'], ['hollow', 'beacon'],
+      ['hollow', 'lumen'], ['pyre', 'lumen'], ['pyre', 'umbra'],
+      ['lumen', 'beacon'], ['lumen', 'umbra'], ['beacon', 'umbra'],
+      ['beacon', 'night-heart'], ['umbra', 'night-heart'],
+    ],
+  },
+  startingWorldIdentifier: 'vigil',
+  openingGuideTargetIdentifier: 'pyre',
+  worldheartUnlockThreshold: 4,
+  routeSuggestions: {
+    vigil: ['hollow', 'pyre'],
+    hollow: ['beacon', 'nightglass', 'lumen', 'pyre'],
+    pyre: ['lumen', 'umbra', 'nightglass', 'hollow'],
+    lumen: ['umbra', 'beacon', 'pyre', 'hollow'],
+    beacon: ['night-heart', 'umbra', 'hollow', 'lumen'],
+    umbra: ['night-heart', 'beacon', 'pyre', 'lumen'],
+    nightglass: ['beacon', 'lumen', 'hollow'],
+  },
+  worlds: [
+    {
+      id: 'vigil', label: 'VIGIL', visualKey: 'vigil',
+      position: { x: -9, y: -7, z: 0 }, radius: 3.15, gravitationalParameter: 90,
+      aliveColor: 0x536d72, atmosphereColor: 0x9ebfc2, accentColor: 0xf4d790,
+      initiallyRestored: true, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'One watchfire had refused to go out.',
+      restoration: {
+        durationSeconds: 2.25, waveWidth: 0.044, growthTrailWidth: 0.18,
+        waveColor: 0xe8e5b5, atmosphereOpacity: 0, rotationSpeed: 0.00038,
+        surfaceVariation: 0.08,
+      },
+    },
+    {
+      id: 'pyre', label: 'PYRE', visualKey: 'pyre',
+      position: { x: 9, y: -5.6, z: 0 }, radius: 2.6, gravitationalParameter: 72,
+      aliveColor: 0x9b5447, atmosphereColor: 0xffa27e, accentColor: 0xffd08b,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'Ash lifted, remembering it had once been flame.',
+      restoration: {
+        durationSeconds: 2.2, waveWidth: 0.05, growthTrailWidth: 0.18,
+        waveColor: 0xffcb93, atmosphereOpacity: 0, rotationSpeed: 0.0011,
+        surfaceVariation: 0.045,
+      },
+    },
+    {
+      id: 'hollow', label: 'HOLLOW', visualKey: 'hollow',
+      position: { x: -9.5, y: 3.8, z: 0 }, radius: 2.2, gravitationalParameter: 50,
+      aliveColor: 0x5c667d, atmosphereColor: 0xa8b8dc, accentColor: 0xd5ddff,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'The empty bells rang for a dawn they had never seen.',
+      restoration: {
+        durationSeconds: 1.95, waveWidth: 0.054, growthTrailWidth: 0.2,
+        waveColor: 0xdbe3ff, atmosphereOpacity: 0, rotationSpeed: 0.00062,
+        surfaceVariation: 0.07,
+      },
+    },
+    {
+      id: 'beacon', label: 'BEACON', visualKey: 'beacon',
+      position: { x: 0, y: 8.3, z: 0 }, radius: 4.1, gravitationalParameter: 145,
+      aliveColor: 0x827eab, atmosphereColor: 0xd3ceff, accentColor: 0xffefb0,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'Its buried star opened one patient eye.',
+      restoration: {
+        durationSeconds: 2.8, waveWidth: 0.04, growthTrailWidth: 0.2,
+        waveColor: 0xf3e8ff, atmosphereOpacity: 0, rotationSpeed: 0.00088,
+        surfaceVariation: 0.035,
+      },
+    },
+    {
+      id: 'umbra', label: 'UMBRA', visualKey: 'umbra',
+      position: { x: 10, y: 6.8, z: 0 }, radius: 2.4, gravitationalParameter: 60,
+      aliveColor: 0x414f76, atmosphereColor: 0x929fd3, accentColor: 0xc3d2ff,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'Even the shadow had been keeping the light safe.',
+      restoration: {
+        durationSeconds: 2.05, waveWidth: 0.05, growthTrailWidth: 0.2,
+        waveColor: 0xc7d4ff, atmosphereOpacity: 0, rotationSpeed: 0.00076,
+        surfaceVariation: 0.05,
+      },
+    },
+    {
+      id: 'lumen', label: 'LUMEN', visualKey: 'lumen',
+      position: { x: 3.2, y: 0.6, z: 0 }, radius: 1.5, gravitationalParameter: 21,
+      aliveColor: 0x9d884c, atmosphereColor: 0xf3dda0, accentColor: 0xfff1b5,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'The smallest lamp had counted every hour.',
+      restoration: {
+        durationSeconds: 1.72, waveWidth: 0.06, growthTrailWidth: 0.22,
+        waveColor: 0xffedb5, atmosphereOpacity: 0, rotationSpeed: 0.00052,
+        surfaceVariation: 0.065,
+      },
+    },
+  ],
+  tacticalBodies: [
+    {
+      id: 'nightglass', label: 'NIGHTGLASS', kind: 'seedstone',
+      position: { x: -1.8, y: -2, z: 0 }, radius: 0.68, uses: 1,
+      initiallyRestored: true, countsTowardRestoration: false,
+    },
+    {
+      id: 'eclipse', label: 'ECLIPSE', kind: 'hazard', radius: 0.74,
+      countsTowardRestoration: false,
+      orbit: {
+        centre: { x: 0, y: 8.3, z: 0 }, radius: 5.8,
+        phaseRadians: 2.8, angularSpeedRadiansPerSecond: 0.24,
+      },
+    },
+    {
+      id: 'night-heart', label: 'NIGHT HEART', kind: 'worldheart',
+      position: { x: -5.2, y: 9.5, z: 0 }, radius: 0.9,
+      initiallyRestored: false, countsTowardRestoration: false,
+      isRouteDestination: true, routeAvailableInitially: false,
+    },
+  ],
+  stardust: [
+    { id: 'long-night-arc-1', position: { x: -3.12, y: -3.78, z: 0 } },
+    { id: 'long-night-arc-2', position: { x: -3.43, y: -1.22, z: 0 } },
+    { id: 'long-night-arc-3', position: { x: -3.81, y: 1.65, z: 0 } },
+  ],
+};
+
 export const DefaultAuthoredSystemIdentifier = FirstLightSystemDefinition.id;
 
 export const AuthoredSystemDefinitions = {
   [FirstLightSystemDefinition.id]: FirstLightSystemDefinition,
   [BrokenBeltSystemDefinition.id]: BrokenBeltSystemDefinition,
   [WanderingGardenSystemDefinition.id]: WanderingGardenSystemDefinition,
+  [LongNightSystemDefinition.id]: LongNightSystemDefinition,
 };
 
 export const AuthoredCampaignSystemIdentifiers = [
   FirstLightSystemDefinition.id,
   BrokenBeltSystemDefinition.id,
   WanderingGardenSystemDefinition.id,
+  LongNightSystemDefinition.id,
 ];
 
 /** Resolves a requested authored system and safely falls back to the campaign entry. */
