@@ -54,13 +54,16 @@ Names and world counts are provisional. Each system must earn its place through 
 - world physics, a bounded `visualKey`, awakening memory and restoration palette/timing;
 - Seedstones, deterministic hazard orbits and the physical Worldheart exit;
 - authored route suggestions that prioritise useful choices without restricting valid collisions;
-- optional stardust positions and other system mastery data.
+- optional stardust positions and other system mastery data;
+- completion copy and constellation presentation, so a new chapter does not inherit First Light labels or summary geometry.
 
 The validator rejects duplicate or missing identifiers, broken route references, incomplete restoration fields, invalid physics values and impossible objective thresholds before WebGL starts. Runtime creation then clones that validated definition into isolated mutable state, injecting the vector and colour types required by Three.js. Reset restores authored initial state rather than reconstructing content through hard-coded world names.
 
 The current tactical renderer deliberately validates exactly one Seedstone, one deterministic hazard and one Worldheart. Broken Belt must generalise that bounded renderer before authoring additional simultaneous small bodies; invisible collision bodies are never acceptable.
 
 A new system should therefore require one data definition plus deliberately registered visual factories. It must not require a second physics implementation, per-system branches throughout the game loop or duplicated prediction logic. First Light is the behavioural compatibility fixture for this contract.
+
+Authored definitions live in a small campaign registry. During development, `?system=<id>` selects a registered chapter and an unknown identifier safely falls back to First Light. The active system identifier is exposed on the game canvas for release and browser verification; campaign progression will choose from the same registry rather than maintaining a second content path.
 
 ## Meaningful decisions
 

@@ -70,6 +70,8 @@ Exit: one complete branching system feels like a real game chapter rather than a
 
 Pipeline checkpoint: First Light now runs from a validated pure-data authored-system definition covering world physics, visual keys, restoration identity, story, tactical bodies, deterministic orbits, route emphasis, objective threshold and stardust. Runtime state is cloned from that definition, authored suggestions remain non-restrictive, and the release audit requires the content module. Twenty-seven deterministic tests plus desktop branch-order checks and a full 390×844 Worldheart run prove behavioural compatibility at 179 / 180 peak draw calls. The Broken Belt content itself remains the next checkpoint.
 
+Presentation checkpoint: objective pips, completion copy, constellation nodes and edges now come from the selected authored definition. A registry-backed `?system=<id>` development route safely falls back to First Light and marks the active canvas, giving Broken Belt one presentation path instead of system-specific UI branches.
+
 ## Milestone 6 — Authored campaign
 
 - Build the Wandering Garden and Long Night systems using the proven content pipeline.

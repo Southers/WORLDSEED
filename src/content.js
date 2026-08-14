@@ -52,6 +52,14 @@ export function validateAuthoredSystemDefinition(SystemDefinition) {
   if (!SystemDefinition.label || typeof SystemDefinition.label !== 'string') {
     Errors.push('Authored system requires a display label.');
   }
+  const CompletionDefinition = SystemDefinition.completion;
+  for (const CompletionField of [
+    'eyebrow', 'title', 'perfectTitle', 'body', 'perfectBody',
+  ]) {
+    if (!CompletionDefinition?.[CompletionField]) {
+      Errors.push(`Authored system completion.${CompletionField} is required.`);
+    }
+  }
 
   const WorldDefinitions = Array.isArray(SystemDefinition.worlds)
     ? SystemDefinition.worlds
@@ -234,6 +242,49 @@ export function validateAuthoredSystemDefinition(SystemDefinition) {
     }
   }
 
+  const ConstellationDefinition = SystemDefinition.constellation;
+  const ConstellationNodes = Array.isArray(ConstellationDefinition?.nodes)
+    ? ConstellationDefinition.nodes
+    : [];
+  const ConstellationEdges = Array.isArray(ConstellationDefinition?.edges)
+    ? ConstellationDefinition.edges
+    : [];
+  const ExpectedConstellationIdentifiers = new Set([
+    ...WorldDefinitions.map((WorldDefinition) => WorldDefinition.id),
+    ...WorldheartDefinitions.map((WorldheartDefinition) => WorldheartDefinition.id),
+  ]);
+  const ConstellationNodeIdentifiers = new Set();
+  for (const ConstellationNode of ConstellationNodes) {
+    if (ConstellationNodeIdentifiers.has(ConstellationNode.id)) {
+      Errors.push(`Duplicate constellation node: ${ConstellationNode.id ?? '<unknown>'}.`);
+    }
+    if (!ExpectedConstellationIdentifiers.has(ConstellationNode.id)) {
+      Errors.push(`Constellation node ${ConstellationNode.id ?? '<unknown>'} does not exist.`);
+    }
+    if (
+      !Number.isFinite(ConstellationNode.x)
+      || !Number.isFinite(ConstellationNode.y)
+    ) {
+      Errors.push(`Constellation node ${ConstellationNode.id ?? '<unknown>'} needs finite coordinates.`);
+    }
+    ConstellationNodeIdentifiers.add(ConstellationNode.id);
+  }
+  for (const ExpectedIdentifier of ExpectedConstellationIdentifiers) {
+    if (!ConstellationNodeIdentifiers.has(ExpectedIdentifier)) {
+      Errors.push(`Constellation is missing node ${ExpectedIdentifier}.`);
+    }
+  }
+  for (const ConstellationEdge of ConstellationEdges) {
+    if (
+      !Array.isArray(ConstellationEdge)
+      || ConstellationEdge.length !== 2
+      || !ConstellationNodeIdentifiers.has(ConstellationEdge[0])
+      || !ConstellationNodeIdentifiers.has(ConstellationEdge[1])
+    ) {
+      Errors.push('Constellation edges must reference two authored nodes.');
+    }
+  }
+
   return Errors;
 }
 
@@ -294,6 +345,15 @@ export function createAuthoredSystemRuntime(
   return {
     id: SystemDefinition.id,
     label: SystemDefinition.label,
+    completion: { ...SystemDefinition.completion },
+    constellation: {
+      nodes: SystemDefinition.constellation.nodes.map((NodeDefinition) => ({
+        ...NodeDefinition,
+      })),
+      edges: SystemDefinition.constellation.edges.map((EdgeDefinition) => [
+        ...EdgeDefinition,
+      ]),
+    },
     startingWorldIdentifier: SystemDefinition.startingWorldIdentifier,
     openingGuideTargetIdentifier: SystemDefinition.openingGuideTargetIdentifier,
     worldheartUnlockThreshold: SystemDefinition.worldheartUnlockThreshold,
@@ -314,6 +374,28 @@ export function createAuthoredSystemRuntime(
 export const FirstLightSystemDefinition = {
   id: 'first-light',
   label: 'FIRST LIGHT',
+  completion: {
+    eyebrow: 'FIRST LIGHT RECONNECTED',
+    title: 'The Worldheart hears you.',
+    perfectTitle: 'First Light blooms perfectly.',
+    body: 'A living path reaches onward. Return for the dim emblems whenever you like.',
+    perfectBody: 'Every world and every arc now shines in the living constellation.',
+  },
+  constellation: {
+    nodes: [
+      { id: 'meadow', label: 'Meadow', x: 24, y: 70 },
+      { id: 'grove', label: 'Grove', x: 64, y: 32 },
+      { id: 'frost', label: 'Frost', x: 120, y: 18 },
+      { id: 'tide', label: 'Tide', x: 184, y: 30 },
+      { id: 'ember', label: 'Ember', x: 118, y: 70 },
+      { id: 'worldheart', label: 'Worldheart', x: 214, y: 68, isHeart: true },
+    ],
+    edges: [
+      ['meadow', 'grove'], ['grove', 'frost'], ['frost', 'tide'],
+      ['tide', 'worldheart'], ['meadow', 'ember'], ['ember', 'tide'],
+      ['grove', 'ember'],
+    ],
+  },
   startingWorldIdentifier: 'meadow',
   openingGuideTargetIdentifier: 'ember',
   worldheartUnlockThreshold: 3,
@@ -411,3 +493,15 @@ export const FirstLightSystemDefinition = {
     { id: 'first-light-arc-3', position: { x: -0.99, y: 1.45, z: 0 } },
   ],
 };
+
+export const DefaultAuthoredSystemIdentifier = FirstLightSystemDefinition.id;
+
+export const AuthoredSystemDefinitions = {
+  [FirstLightSystemDefinition.id]: FirstLightSystemDefinition,
+};
+
+/** Resolves a requested authored system and safely falls back to the campaign entry. */
+export function getAuthoredSystemDefinition(SystemIdentifier) {
+  return AuthoredSystemDefinitions[SystemIdentifier]
+    ?? AuthoredSystemDefinitions[DefaultAuthoredSystemIdentifier];
+}

@@ -132,6 +132,13 @@ async function verifyLocalRelease() {
   requirePattern(MainJavaScript, /\.\/physics\.js\?v=[^"']+/, 'main physics import');
   requirePattern(MainJavaScript, /\.\/restoration\.js\?v=[^"']+/, 'main restoration import');
   requireText(MainJavaScript, "dataset.build = '", 'main build marker');
+  requireText(MainJavaScript, 'getAuthoredSystemDefinition', 'main authored-system selection');
+  requireText(MainJavaScript, 'dataset.system = ActiveSystem.id', 'main active-system marker');
+
+  const ContentJavaScript = TextByPath.get('src/content.js');
+  requireText(ContentJavaScript, 'AuthoredSystemDefinitions', 'authored-system registry');
+  requireText(ContentJavaScript, 'completion:', 'authored completion presentation');
+  requireText(ContentJavaScript, 'constellation:', 'authored constellation presentation');
 
   const SubmissionMarkdown = TextByPath.get('SUBMISSION.md');
   requireText(SubmissionMarkdown, PublicGameUrl, 'SUBMISSION.md');

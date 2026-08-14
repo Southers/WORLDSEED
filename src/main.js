@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7f';
+import { WorldseedAudio } from './audio.js?v=20260814-7g';
 
 import {
-  FirstLightSystemDefinition,
+  DefaultAuthoredSystemIdentifier,
   createAuthoredSystemRuntime,
-} from './content.js?v=20260814-7f';
+  getAuthoredSystemDefinition,
+} from './content.js?v=20260814-7g';
 
 import {
   countRestoredWorlds,
@@ -16,7 +17,7 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260814-7f';
+} from './campaign.js?v=20260814-7g';
 
 import {
   calculateBodyPositionAtTime,
@@ -26,17 +27,22 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7f';
+} from './physics.js?v=20260814-7g';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7f';
+} from './restoration.js?v=20260814-7g';
 
-const ActiveSystem = createAuthoredSystemRuntime(FirstLightSystemDefinition, {
-  createVector,
-  createColor: (ColorValue) => new THREE.Color(ColorValue),
-});
+const RequestedSystemIdentifier = new URLSearchParams(window.location.search).get('system')
+  ?? DefaultAuthoredSystemIdentifier;
+const ActiveSystem = createAuthoredSystemRuntime(
+  getAuthoredSystemDefinition(RequestedSystemIdentifier),
+  {
+    createVector,
+    createColor: (ColorValue) => new THREE.Color(ColorValue),
+  },
+);
 const WorldDefinitions = ActiveSystem.worlds;
 const TacticalBodyDefinitions = ActiveSystem.tacticalBodies;
 const SeedstoneDefinition = TacticalBodyDefinitions.find(
@@ -56,7 +62,7 @@ const CampaignNodeDefinitions = [
 const StardustDefinitions = ActiveSystem.stardust;
 
 /**
- * WORLDSEED — First Light branching-system prototype.
+ * WORLDSEED — authored-system orbital restoration campaign.
  *
  * The game deliberately keeps the simulation in a flat orbital plane while rendering
  * fully three-dimensional worlds. This produces immediately readable slingshot controls
@@ -69,7 +75,8 @@ const WorldCounterElement = document.querySelector('#WorldCounter');
 const StardustCounterElement = document.querySelector('#StardustCounter');
 const ObjectivePanelElement = document.querySelector('#ObjectivePanel');
 const ObjectiveStateElement = document.querySelector('#ObjectiveState');
-const ObjectivePipElements = [...document.querySelectorAll('.objective-panel__pips span')];
+const ObjectivePipsElement = document.querySelector('#ObjectivePips');
+let ObjectivePipElements = [];
 const InstructionPanelElement = document.querySelector('#InstructionPanel');
 const InstructionTitleElement = document.querySelector('#InstructionTitle');
 const InstructionBodyElement = document.querySelector('#InstructionBody');
@@ -81,14 +88,19 @@ const StatusToastElement = document.querySelector('#StatusToast');
 const RouteLabelElements = [...document.querySelectorAll('.route-label')];
 const TacticalLabelElements = [...document.querySelectorAll('.tactical-label')];
 const VictoryPanelElement = document.querySelector('#VictoryPanel');
+const VictoryEyebrowElement = document.querySelector('#VictoryEyebrow');
 const VictoryTitleElement = document.querySelector('#VictoryTitle');
 const VictoryBodyElement = document.querySelector('#VictoryBody');
+const ConstellationSummaryElement = document.querySelector('#ConstellationSummary');
+const EmblemRowElement = document.querySelector('#EmblemRow');
 const EmblemElements = [...document.querySelectorAll('[data-emblem]')];
-const ConstellationNodeElements = [...document.querySelectorAll('[data-world-id]')];
+let ConstellationNodeElements = [];
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260814-7f';
+configureSystemInterface();
+GameCanvas.dataset.build = '20260814-7g';
+GameCanvas.dataset.system = ActiveSystem.id;
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -187,6 +199,53 @@ const ShaderMotionVisualKeys = ['grove', 'tide'];
 const DeadWorldColor = new THREE.Color(0x575d60);
 const DarkWorldColor = new THREE.Color(0x2c3337);
 const RestorableWorldCount = getRestorableWorlds(WorldDefinitions).length;
+
+/** Builds system-specific objective and completion UI from authored content. */
+function configureSystemInterface() {
+  VictoryEyebrowElement.textContent = ActiveSystem.completion.eyebrow;
+  VictoryTitleElement.textContent = ActiveSystem.completion.title;
+  VictoryBodyElement.textContent = ActiveSystem.completion.body;
+  ConstellationSummaryElement.setAttribute(
+    'aria-label',
+    `${ActiveSystem.label} constellation summary`,
+  );
+  EmblemRowElement.setAttribute('aria-label', `${ActiveSystem.label} emblems`);
+
+  ObjectivePipsElement.replaceChildren();
+  for (let PipIndex = 0; PipIndex < ActiveSystem.worldheartUnlockThreshold; PipIndex += 1) {
+    ObjectivePipsElement.append(document.createElement('span'));
+  }
+  ObjectivePipElements = [...ObjectivePipsElement.children];
+
+  const SvgNamespace = 'http://www.w3.org/2000/svg';
+  const ConstellationNodeByIdentifier = new Map(
+    ActiveSystem.constellation.nodes.map((NodeDefinition) => [NodeDefinition.id, NodeDefinition]),
+  );
+  const ConstellationPath = document.createElementNS(SvgNamespace, 'path');
+  ConstellationPath.setAttribute('d', ActiveSystem.constellation.edges.map((EdgeDefinition) => {
+    const SourceNode = ConstellationNodeByIdentifier.get(EdgeDefinition[0]);
+    const TargetNode = ConstellationNodeByIdentifier.get(EdgeDefinition[1]);
+    return `M${SourceNode.x} ${SourceNode.y} L${TargetNode.x} ${TargetNode.y}`;
+  }).join(' '));
+  ConstellationSummaryElement.replaceChildren(ConstellationPath);
+
+  for (const NodeDefinition of ActiveSystem.constellation.nodes) {
+    const NodeGroup = document.createElementNS(SvgNamespace, 'g');
+    NodeGroup.setAttribute('data-world-id', NodeDefinition.id);
+    NodeGroup.classList.toggle('is-heart', NodeDefinition.isHeart === true);
+    const NodeCircle = document.createElementNS(SvgNamespace, 'circle');
+    NodeCircle.setAttribute('cx', String(NodeDefinition.x));
+    NodeCircle.setAttribute('cy', String(NodeDefinition.y));
+    NodeCircle.setAttribute('r', NodeDefinition.isHeart ? '7' : '5');
+    const NodeTitle = document.createElementNS(SvgNamespace, 'title');
+    NodeTitle.textContent = NodeDefinition.label;
+    NodeGroup.append(NodeCircle, NodeTitle);
+    ConstellationSummaryElement.append(NodeGroup);
+  }
+  ConstellationNodeElements = [
+    ...ConstellationSummaryElement.querySelectorAll('[data-world-id]'),
+  ];
+}
 
 /**
  * Adds restrained scene lighting. The tiny-world art pass can later replace this with a
@@ -816,7 +875,7 @@ function createTideSurfaceGeometry(WorldDefinition) {
   return mergeRestorationGeometries(Geometries);
 }
 
-/** Selects the one-call authored geometry used by a lightweight First Light route world. */
+/** Selects one-call authored geometry for lightweight route worlds. */
 function createPrototypeSurfaceGeometry(WorldDefinition) {
   const PrototypeGeometryFactories = {
     grove: createGroveSurfaceGeometry,
@@ -1923,7 +1982,10 @@ function showRouteChoiceInstruction() {
     return;
   }
   if (RouteChoices.length === 0) {
-    showInstruction('The First Light network is awake', 'Find the golden Worldheart route.');
+    showInstruction(
+      `The ${ActiveSystem.label} network is awake`,
+      'Find the golden Worldheart route.',
+    );
     return;
   }
 
@@ -2157,11 +2219,11 @@ function updateVictorySummary() {
   const EarnedEmblemCount = Object.values(Emblems).filter(Boolean).length;
 
   VictoryTitleElement.textContent = EarnedEmblemCount === 3
-    ? 'First Light blooms perfectly.'
-    : 'The Worldheart hears you.';
+    ? ActiveSystem.completion.perfectTitle
+    : ActiveSystem.completion.title;
   VictoryBodyElement.textContent = EarnedEmblemCount === 3
-    ? 'Every world and every arc now shines in the living constellation.'
-    : 'A living path reaches onward. Return for the dim emblems whenever you like.';
+    ? ActiveSystem.completion.perfectBody
+    : ActiveSystem.completion.body;
 
   for (const EmblemElement of EmblemElements) {
     const IsEarned = Emblems[EmblemElement.dataset.emblem] === true;
