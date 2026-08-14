@@ -5,6 +5,7 @@ import { getTrajectoryPickupIdentifiers } from '../src/campaign.js';
 import {
   BrokenBeltSystemDefinition,
   LongNightSystemDefinition,
+  WorldheartSystemDefinition,
   WanderingGardenSystemDefinition,
   createAuthoredSystemRuntime,
 } from '../src/content.js';
@@ -1087,5 +1088,196 @@ test('Long Night Beacon exit reaches the Night Heart with matching live physics'
   assert.equal(Prediction.collisionKind, 'worldheart');
   assert.equal(Prediction.collisionBodyIdentifier, 'night-heart');
   assert.equal(LiveCollision?.definition.id, 'night-heart');
+  assert.equal(LiveCollisionStep, Prediction.points.length - 1);
+});
+
+test('Worldheart finale opens with a safe landing and a long alternate commitment', () => {
+  const Runtime = createAuthoredSystemRuntime(WorldheartSystemDefinition, { createVector });
+  const Confluence = Runtime.worlds.find((World) => World.id === 'confluence');
+  const Kindle = Runtime.worlds.find((World) => World.id === 'kindle');
+  const Direction = createVector(
+    Kindle.position.x - Confluence.position.x,
+    Kindle.position.y - Confluence.position.y,
+    0,
+  );
+  const DirectionLength = Math.hypot(Direction.x, Direction.y);
+  const StartingPosition = createVector(
+    Confluence.position.x + ((Direction.x / DirectionLength) * (Confluence.radius + 0.49)),
+    Confluence.position.y + ((Direction.y / DirectionLength) * (Confluence.radius + 0.49)),
+    0,
+  );
+  const ActiveBodies = Runtime.tacticalBodies.filter((Body) => Body.kind !== 'worldheart');
+  const predictOpening = (Velocity) => predictTrajectory(
+    StartingPosition,
+    Velocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: 1 / 120,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'confluence',
+      collisionBodyDefinitions: ActiveBodies,
+      startTimeSeconds: 0,
+    },
+  );
+  const Direct = predictOpening(createVector(
+    (Direction.x / DirectionLength) * 7.1,
+    (Direction.y / DirectionLength) * 7.1,
+    0,
+  ));
+  const AlternateAngle = 160 * (Math.PI / 180);
+  const Alternate = predictOpening(createVector(
+    Math.cos(AlternateAngle) * 3.4,
+    Math.sin(AlternateAngle) * 3.4,
+    0,
+  ));
+
+  assert.equal(Direct.collisionWorldIdentifier, 'kindle');
+  assert.equal(Alternate.collisionWorldIdentifier, 'memory');
+  assert.ok(Alternate.points.length > Direct.points.length + 200);
+});
+
+test('Worldheart Arc is blocked by Last Shadow until its deterministic opening', () => {
+  const Runtime = createAuthoredSystemRuntime(WorldheartSystemDefinition, { createVector });
+  const Confluence = Runtime.worlds.find((World) => World.id === 'confluence');
+  const Kindle = Runtime.worlds.find((World) => World.id === 'kindle');
+  const Direction = createVector(
+    Kindle.position.x - Confluence.position.x,
+    Kindle.position.y - Confluence.position.y,
+    0,
+  );
+  const DirectionLength = Math.hypot(Direction.x, Direction.y);
+  const StartingPosition = createVector(
+    Confluence.position.x + ((Direction.x / DirectionLength) * (Confluence.radius + 0.49)),
+    Confluence.position.y + ((Direction.y / DirectionLength) * (Confluence.radius + 0.49)),
+    0,
+  );
+  const ArcAngle = 18 * (Math.PI / 180);
+  const ArcVelocity = createVector(
+    Math.cos(ArcAngle) * 4.1,
+    Math.sin(ArcAngle) * 4.1,
+    0,
+  );
+  const ActiveBodies = Runtime.tacticalBodies.filter((Body) => Body.kind !== 'worldheart');
+  const predictArc = (StartTimeSeconds) => predictTrajectory(
+    StartingPosition,
+    ArcVelocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: 1 / 120,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'confluence',
+      collisionBodyDefinitions: ActiveBodies,
+      startTimeSeconds: StartTimeSeconds,
+    },
+  );
+  const Blocked = predictArc(0);
+  const Clear = predictArc(2.5);
+
+  assert.equal(Blocked.collisionKind, 'hazard');
+  assert.equal(Blocked.collisionBodyIdentifier, 'last-shadow');
+  assert.equal(Clear.collisionWorldIdentifier, 'starwell');
+  assert.deepEqual(
+    getTrajectoryPickupIdentifiers(Clear.points, Runtime.stardust, 0.68).sort(),
+    Runtime.stardust.map((Pickup) => Pickup.id).sort(),
+  );
+});
+
+test('Worldheart Memory Moon matches the moving prediction after the long opening route', () => {
+  const FixedStepSeconds = 1 / 120;
+  const Runtime = createAuthoredSystemRuntime(WorldheartSystemDefinition, { createVector });
+  const StartingPosition = createVector(-8.847697764545135, 1.1902870284989984, 0);
+  const LaunchAngle = 316 * (Math.PI / 180);
+  const LaunchVelocity = createVector(
+    Math.cos(LaunchAngle) * 5.1,
+    Math.sin(LaunchAngle) * 5.1,
+    0,
+  );
+  const ActiveBodies = Runtime.tacticalBodies.filter((Body) => Body.kind !== 'worldheart');
+  const StartTimeSeconds = 7;
+  const Prediction = predictTrajectory(
+    StartingPosition,
+    LaunchVelocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: FixedStepSeconds,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'memory',
+      collisionBodyDefinitions: ActiveBodies,
+      startTimeSeconds: StartTimeSeconds,
+    },
+  );
+
+  let LiveState = { position: StartingPosition, velocity: LaunchVelocity };
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 520; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, Runtime.worlds, FixedStepSeconds);
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      0.46,
+      ActiveBodies,
+      StartTimeSeconds + (StepIndex * FixedStepSeconds),
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(Prediction.collisionKind, 'seedstone');
+  assert.equal(Prediction.collisionBodyIdentifier, 'memory-moon');
+  assert.equal(LiveCollision?.definition.id, 'memory-moon');
+  assert.equal(LiveCollisionStep, Prediction.points.length - 1);
+});
+
+test('Worldheart finale exit reaches the core with matching live physics', () => {
+  const FixedStepSeconds = 1 / 120;
+  const Runtime = createAuthoredSystemRuntime(WorldheartSystemDefinition, { createVector });
+  const StartingPosition = createVector(-3.761034475181679, 5.668893830250314, 0);
+  const LaunchAngle = 43 * (Math.PI / 180);
+  const LaunchVelocity = createVector(
+    Math.cos(LaunchAngle) * 2,
+    Math.sin(LaunchAngle) * 2,
+    0,
+  );
+  const CollisionBodies = Runtime.tacticalBodies.filter((Body) => Body.kind !== 'seedstone');
+  const StartTimeSeconds = 10;
+  const Prediction = predictTrajectory(
+    StartingPosition,
+    LaunchVelocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: FixedStepSeconds,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'starwell',
+      collisionBodyDefinitions: CollisionBodies,
+      startTimeSeconds: StartTimeSeconds,
+    },
+  );
+
+  let LiveState = { position: StartingPosition, velocity: LaunchVelocity };
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 520; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, Runtime.worlds, FixedStepSeconds);
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      0.46,
+      CollisionBodies,
+      StartTimeSeconds + (StepIndex * FixedStepSeconds),
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(Prediction.collisionKind, 'worldheart');
+  assert.equal(Prediction.collisionBodyIdentifier, 'worldheart-core');
+  assert.equal(LiveCollision?.definition.id, 'worldheart-core');
   assert.equal(LiveCollisionStep, Prediction.points.length - 1);
 });

@@ -100,6 +100,8 @@ Long Night checkpoint: the campaign now continues into six darker authored world
 
 Exit: WORLDSEED is a polished, reliable, submission-ready game. Stop before the final external Submit or Publish action and obtain the user's explicit confirmation.
 
+Finale checkpoint: the campaign now advances from Long Night into a six-world Worldheart chapter—Confluence, Kindle, Memory, Starwell, Dawn and Chorus. It recombines the proven safe/long opening, orbiting one-use launch node, deterministic timing hazard, heavy gravity well and banked three-mote Arc before a four-world physical core gate. Once unlocked, the core becomes the first authored suggestion from every launch node. Landing there triggers a 3.4-second pooled system restoration—route lines, expanding rings, deterministic sparks and an environment bloom—before the final constellation summary. Fifty-two deterministic tests cover the finale contract, both openings, Last Shadow timing, full Arc, moving Memory Moon prediction/live agreement and core prediction/live agreement. Desktop and 390×844 completed Confluence → Kindle → Dawn → Starwell → Memory → Worldheart; mobile also verified corrected exit guidance and Replay reset. The runs peaked at 23 / 22 draw calls with clean consoles. Campaign-wide profiling, lifecycle/accessibility checks and final media remain before milestone exit.
+
 ## Validation gate for every milestone
 
 1. Run `npm test` and `npm run check`.

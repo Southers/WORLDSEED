@@ -2,9 +2,9 @@
 
 **Bring the little worlds back to life.**
 
-WORLDSEED began as a focused Three.js **Tiny Worlds** prototype and is now growing into an authored planetary campaign. It is a one-input orbital slingshot game: drag the living seed backwards, release it into the gravity wells of miniature planets, choose where to land, and rebuild a connected constellation one awakening at a time.
+WORLDSEED began as a focused Three.js **Tiny Worlds** prototype and is now a five-chapter authored planetary campaign. It is a one-input orbital slingshot game: drag the living seed backwards, release it into the gravity wells of miniature planets, choose where to land, and rebuild a connected constellation one awakening at a time.
 
-The polished Meadow → Ember → Frost journey is the prologue and visual benchmark. The current First Light prototype adds Grove and Tide as lightweight authored route worlds, a one-use Seedstone launchpad, a deterministic orbiting asteroid, a three-mote optional Arc and a physical Worldheart exit. Together they prove branching routes, persistent launch nodes, readable timing decisions, trustworthy mastery feedback and an understandable system objective before the wider campaign is built.
+The polished Meadow → Ember → Frost journey is the prologue and visual benchmark. First Light expands it with branching routes, a one-use Seedstone, a deterministic asteroid, optional Arc mastery and a physical system exit. Broken Belt, Wandering Garden and Long Night then deepen spatial, moving-body and timing decisions before the Worldheart finale recombines them into the campaign's largest restoration payoff.
 
 ## Play
 
@@ -15,6 +15,7 @@ The authored chapters can also be selected directly for development and replay:
 - **Broken Belt:** https://southers.github.io/WORLDSEED/?system=broken-belt
 - **Wandering Garden:** https://southers.github.io/WORLDSEED/?system=wandering-garden
 - **The Long Night:** https://southers.github.io/WORLDSEED/?system=long-night
+- **Worldheart finale:** https://southers.github.io/WORLDSEED/?system=worldheart
 
 ### Release smoke test
 
@@ -46,6 +47,9 @@ The current build includes:
 - six new low-cost Garden silhouettes—sheltering arches, flower lamps, clustered treetops, giant petals, droplets and woven ribs—restored through the existing planet-wrapping wave;
 - a selectable six-world Long Night chapter with heavier gravity wells, longer routes, an authored dark lighting palette, deterministic Eclipse timing and a four-world Night Heart gate;
 - six Long Night silhouettes—watchfires, swept flames, empty bells, star rays, crescents and a prism—merged into their restoration surfaces;
+- a selectable six-world Worldheart finale that recombines safe and long openings, a moving Memory Moon, Last Shadow timing, a gravity Arc and a physical four-world core gate;
+- six finale silhouettes that braid the campaign's arches, roots, flames, signal rings, petals, star fins and memory prisms into new one-call worlds;
+- a 3.4-second system-scale ending where the restored routes light from the physical core, five pulse rings cross the system, sparks fill the constellation and the environment blooms before the final summary;
 - six low-cost authored silhouettes whose signal rings, vents, linked arches, crystal crown, wave crests and vault ribs grow inside the same one-call restoration surface;
 - two suggested route choices with world-space HUD labels and a single instanced beacon draw call;
 - persistent restored launch nodes, so landing order changes the next useful geometry;
@@ -84,7 +88,9 @@ Wandering Garden is the first moving-launch chapter. Bower again opens with two 
 
 Long Night escalates through route geometry instead of a new verb. Vigil offers the readable Pyre line or the much longer Hollow commitment; an optional three-mote arc bends all the way into Beacon, but Eclipse makes the immediate prediction red until its deterministic orbit clears. The chapter requires four awakenings before the Night Heart route opens and banks Arc motes only after survival. Browser evidence covers both desktop openings, the blocked and cleared full Arc, and a complete 390×844 Vigil → Pyre → Umbra → Beacon → Hollow → Night Heart run with failure recovery, close-pass feedback, Replay reset, 20 peak draw calls and no console warnings or errors.
 
-Completing First Light offers **Continue to BROKEN BELT**, Broken Belt offers **Continue to WANDERING GARDEN**, and the Garden offers **Continue to THE LONG NIGHT**. The current frontier offers **Replay THE LONG NIGHT**, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
+Worldheart is the campaign payoff rather than another escalation mechanic. Confluence offers Kindle's readable line or Memory's four-second commitment; Memory exposes an orbiting one-use Moon, while the direct three-mote Starwell Arc begins behind Last Shadow's deterministic timing window. Four awakenings make the physical core the first suggested route from every launch node, while a fifth world remains optional for Bloom. The final landing delays the summary for a 3.4-second system-wide light pulse. Desktop and 390×844 runs both completed Confluence → Kindle → Dawn → Starwell → Memory → Worldheart, verified the corrected exit guidance, gravity-assist feedback and Replay reset, and peaked at 23 / 22 draw calls with clean consoles.
+
+Completing First Light offers **Continue to BROKEN BELT**, Broken Belt offers **Continue to WANDERING GARDEN**, the Garden offers **Continue to THE LONG NIGHT**, and Long Night offers **Continue to WORLDHEART**. The campaign frontier offers **Replay WORLDHEART**, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
 
 ### Visual budget
 

@@ -7,6 +7,7 @@ import {
   BrokenBeltSystemDefinition,
   FirstLightSystemDefinition,
   LongNightSystemDefinition,
+  WorldheartSystemDefinition,
   WanderingGardenSystemDefinition,
   AuthoredCampaignSystemIdentifiers,
   createAuthoredSystemRuntime,
@@ -41,6 +42,16 @@ test('Long Night satisfies the authored campaign and environment contract', () =
   const Runtime = createAuthoredSystemRuntime(LongNightSystemDefinition);
   assert.equal(Runtime.environment.backgroundColor, 0x02030b);
   assert.equal(Runtime.environment.toneMappingExposure, 1.08);
+});
+
+test('Worldheart satisfies the authored finale contract', () => {
+  assert.deepEqual(validateAuthoredSystemDefinition(WorldheartSystemDefinition), []);
+  assert.equal(WorldheartSystemDefinition.worlds.length, 6);
+  assert.equal(WorldheartSystemDefinition.worldheartUnlockThreshold, 4);
+  const Runtime = createAuthoredSystemRuntime(WorldheartSystemDefinition);
+  assert.equal(Runtime.finale.isCampaignFinale, true);
+  assert.equal(Runtime.finale.victoryDelaySeconds, 3.4);
+  assert.equal(Runtime.finale.pulseColor, 0xffe0a0);
 });
 
 test('runtime creation isolates mutable play state from authored content', () => {
@@ -122,19 +133,41 @@ test('system selection falls back to the authored campaign entry', () => {
     WanderingGardenSystemDefinition,
   );
   assert.equal(getAuthoredSystemDefinition('long-night'), LongNightSystemDefinition);
+  assert.equal(getAuthoredSystemDefinition('worldheart'), WorldheartSystemDefinition);
   assert.equal(getAuthoredSystemDefinition('missing-system'), FirstLightSystemDefinition);
 });
 
-test('campaign order advances through Long Night and leaves the frontier replayable', () => {
+test('campaign order advances through Long Night into the Worldheart finale', () => {
   assert.deepEqual(
     AuthoredCampaignSystemIdentifiers,
-    ['first-light', 'broken-belt', 'wandering-garden', 'long-night'],
+    ['first-light', 'broken-belt', 'wandering-garden', 'long-night', 'worldheart'],
   );
   assert.equal(getNextAuthoredSystemIdentifier('first-light'), 'broken-belt');
   assert.equal(getNextAuthoredSystemIdentifier('broken-belt'), 'wandering-garden');
   assert.equal(getNextAuthoredSystemIdentifier('wandering-garden'), 'long-night');
-  assert.equal(getNextAuthoredSystemIdentifier('long-night'), null);
+  assert.equal(getNextAuthoredSystemIdentifier('long-night'), 'worldheart');
+  assert.equal(getNextAuthoredSystemIdentifier('worldheart'), null);
   assert.equal(getNextAuthoredSystemIdentifier('missing-system'), null);
+});
+
+test('Worldheart opens with two commitments and keeps its moving moon optional', () => {
+  const Runtime = createAuthoredSystemRuntime(WorldheartSystemDefinition);
+  const CampaignNodes = [
+    ...Runtime.worlds,
+    ...Runtime.tacticalBodies.filter((BodyDefinition) => BodyDefinition.kind !== 'hazard'),
+  ];
+
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'confluence', 2, Runtime.routeSuggestions.confluence)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['memory', 'kindle'],
+  );
+  Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'memory').restored = true;
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'memory', 2, Runtime.routeSuggestions.memory)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['memory-moon', 'starwell'],
+  );
 });
 
 test('Long Night route order preserves a safe line and a higher-gravity commitment', () => {
