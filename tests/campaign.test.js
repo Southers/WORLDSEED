@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   countRestoredWorlds,
+  getLandingAccolade,
   getRouteChoices,
   getSystemEmblems,
   getTrajectoryPickupIdentifiers,
@@ -157,6 +158,31 @@ test('system emblems separate basic completion from optional mastery', () => {
     bloom: true,
     arc: true,
   });
+});
+
+test('landing accolades prioritise risk, then gravity routing, then clean recovery', () => {
+  assert.equal(getLandingAccolade({
+    hadAsteroidClosePass: true,
+    closePassWorldIdentifiers: ['grove'],
+    landingWorldIdentifier: 'frost',
+    isNewWorldLanding: true,
+  }), 'CLOSE PASS');
+
+  assert.equal(getLandingAccolade({
+    closePassWorldIdentifiers: new Set(['tide', 'frost']),
+    landingWorldIdentifier: 'frost',
+    isNewWorldLanding: true,
+  }), 'GRAVITY ASSIST');
+
+  assert.equal(getLandingAccolade({
+    closePassWorldIdentifiers: ['frost'],
+    landingWorldIdentifier: 'frost',
+    isNewWorldLanding: true,
+  }), null);
+  assert.equal(getLandingAccolade({
+    landingWorldIdentifier: 'ember',
+    isNewWorldLanding: false,
+  }), 'CLEAN LANDING');
 });
 
 test('trajectory pickup prediction reports each uncollected mote once', () => {

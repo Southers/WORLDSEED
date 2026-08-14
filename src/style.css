@@ -293,6 +293,7 @@ button {
   font-weight: 850;
   letter-spacing: 0.12em;
   text-align: center;
+  width: min(88vw, 680px);
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.7);
   pointer-events: none;
   transition: opacity 180ms ease, transform 180ms ease;
@@ -301,6 +302,14 @@ button {
 .status-toast.is-visible {
   opacity: 1;
   transform: translate(-50%, 0) scale(1);
+}
+
+.status-toast.is-memory {
+  font-size: clamp(13px, 2vw, 20px);
+  font-style: italic;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+  line-height: 1.35;
 }
 
 .route-labels {

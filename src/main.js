@@ -1,16 +1,17 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260813-7c';
+import { WorldseedAudio } from './audio.js?v=20260814-7d';
 
 import {
   countRestoredWorlds,
+  getLandingAccolade,
   getRestorableWorlds,
   getRouteChoices,
   getSystemEmblems,
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260813-7c';
+} from './campaign.js?v=20260814-7d';
 
 import {
   calculateBodyPositionAtTime,
@@ -20,12 +21,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260813-7c';
+} from './physics.js?v=20260814-7d';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260813-7c';
+} from './restoration.js?v=20260814-7d';
 
 /**
  * WORLDSEED — First Light branching-system prototype.
@@ -60,7 +61,7 @@ const ConstellationNodeElements = [...document.querySelectorAll('[data-world-id]
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260813-7c';
+GameCanvas.dataset.build = '20260814-7d';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -77,6 +78,8 @@ const WorldheartUnlockThreshold = 3;
 const StardustPickupRadius = 0.22;
 const StardustCollectionRadius = SeedRadius + StardustPickupRadius;
 const MinimumAdaptivePixelRatio = 1;
+const WorldClosePassClearance = 1.35;
+const AsteroidClosePassClearance = 1.05;
 
 const Scene = new THREE.Scene();
 Scene.background = new THREE.Color(0x06101a);
@@ -141,6 +144,9 @@ let SeedstoneUsesRemaining = 1;
 let SeedstoneCrumbleStartedAtSeconds = null;
 let WorldheartJustUnlocked = false;
 let PredictedStardustIdentifiers = new Set();
+let FlightOriginWorldIdentifier = null;
+let FlightHadAsteroidClosePass = false;
+const FlightClosePassWorldIdentifiers = new Set();
 let SeedPhysicsState = {
   position: createVector(),
   velocity: createVector(),
@@ -163,6 +169,7 @@ const WorldDefinitions = [
     atmosphereColor: new THREE.Color(0x9bcfb4),
     restored: true,
     isStartingWorld: true,
+    memory: 'The seed remembered rain.',
     restoration: {
       durationSeconds: 2.2,
       waveWidth: 0.045,
@@ -183,6 +190,7 @@ const WorldDefinitions = [
     atmosphereColor: new THREE.Color(0xffbe78),
     restored: false,
     isStartingWorld: false,
+    memory: 'One spark had waited beneath the stone.',
     restoration: {
       durationSeconds: 2.35,
       waveWidth: 0.05,
@@ -204,6 +212,7 @@ const WorldDefinitions = [
     restored: false,
     isStartingWorld: false,
     isPrototypeWorld: true,
+    memory: 'The roots were still holding hands.',
     restoration: {
       durationSeconds: 1.85,
       waveWidth: 0.055,
@@ -224,6 +233,7 @@ const WorldDefinitions = [
     atmosphereColor: new THREE.Color(0xbbe8f5),
     restored: false,
     isStartingWorld: false,
+    memory: 'Under the ice, the old ocean was still dreaming.',
     restoration: {
       durationSeconds: 2.65,
       waveWidth: 0.042,
@@ -245,6 +255,7 @@ const WorldDefinitions = [
     restored: false,
     isStartingWorld: false,
     isPrototypeWorld: true,
+    memory: 'The moon-pulled water found its rhythm.',
     restoration: {
       durationSeconds: 1.95,
       waveWidth: 0.052,
@@ -2158,12 +2169,13 @@ function updateWorldCounter() {
  * @param {string} Message - Text shown to the player.
  * @param {number} VisibleDurationMilliseconds - Duration before the toast fades.
  */
-function showStatusToast(Message, VisibleDurationMilliseconds = 900) {
+function showStatusToast(Message, VisibleDurationMilliseconds = 900, Tone = 'status') {
   if (StatusToastTimeoutIdentifier !== null) {
     window.clearTimeout(StatusToastTimeoutIdentifier);
   }
 
   StatusToastElement.textContent = Message;
+  StatusToastElement.classList.toggle('is-memory', Tone === 'memory');
   StatusToastElement.classList.add('is-visible');
 
   StatusToastTimeoutIdentifier = window.setTimeout(() => {
@@ -2183,6 +2195,62 @@ function showInstruction(Title, Body) {
   InstructionBodyElement.textContent = Body;
   InstructionPanelElement.classList.remove('is-hidden');
   InstructionPanelElement.setAttribute('aria-hidden', 'false');
+}
+
+/** Clears per-shot telemetry after a landing, failure or reset. */
+function resetFlightFeedback() {
+  FlightOriginWorldIdentifier = null;
+  FlightHadAsteroidClosePass = false;
+  FlightClosePassWorldIdentifiers.clear();
+}
+
+/** Returns the best accolade earned during the current successful flight. */
+function getCurrentLandingAccolade(LandingWorldIdentifier, IsNewWorldLanding) {
+  return getLandingAccolade({
+    hadAsteroidClosePass: FlightHadAsteroidClosePass,
+    closePassWorldIdentifiers: FlightClosePassWorldIdentifiers,
+    landingWorldIdentifier: LandingWorldIdentifier,
+    isNewWorldLanding: IsNewWorldLanding,
+  });
+}
+
+/** Samples Wayfarer clearance directly from its authored orbit without allocating vectors. */
+function getAsteroidSurfaceClearance() {
+  const OrbitAngle = AsteroidDefinition.orbit.phaseRadians
+    + (PhysicsElapsedTimeSeconds * AsteroidDefinition.orbit.angularSpeedRadiansPerSecond);
+  const AsteroidPositionX = AsteroidDefinition.orbit.centre.x
+    + (Math.cos(OrbitAngle) * AsteroidDefinition.orbit.radius);
+  const AsteroidPositionY = AsteroidDefinition.orbit.centre.y
+    + (Math.sin(OrbitAngle) * AsteroidDefinition.orbit.radius);
+  return Math.hypot(
+    SeedPhysicsState.position.x - AsteroidPositionX,
+    SeedPhysicsState.position.y - AsteroidPositionY,
+  ) - AsteroidDefinition.radius - SeedRadius;
+}
+
+/** Records deterministic world and asteroid flybys from the live fixed-step position. */
+function updateFlightFeedback() {
+  for (const WorldDefinition of WorldDefinitions) {
+    if (WorldDefinition.id === FlightOriginWorldIdentifier) {
+      continue;
+    }
+    const CentreDistance = Math.sqrt(calculateDistanceSquared(
+      SeedPhysicsState.position,
+      WorldDefinition.position,
+    ));
+    const SurfaceClearance = CentreDistance - WorldDefinition.radius - SeedRadius;
+    if (SurfaceClearance > 0 && SurfaceClearance <= WorldClosePassClearance) {
+      FlightClosePassWorldIdentifiers.add(WorldDefinition.id);
+    }
+  }
+
+  const AsteroidSurfaceClearance = getAsteroidSurfaceClearance();
+  if (
+    AsteroidSurfaceClearance > 0
+    && AsteroidSurfaceClearance <= AsteroidClosePassClearance
+  ) {
+    FlightHadAsteroidClosePass = true;
+  }
 }
 
 /** Hides the helper once a launch is in progress. */
@@ -2277,22 +2345,32 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
   LaunchIgnoredWorldIdentifier = null;
 
   const WasAlreadyRestored = WorldDefinition.restored;
+  const LandingAccolade = getCurrentLandingAccolade(
+    WorldDefinition.id,
+    !WasAlreadyRestored,
+  );
+  GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
+  resetFlightFeedback();
   restoreWorld(WorldDefinition, ImpactPosition);
 
   if (GamePhase === 'restoring') {
     showInstruction(
       `Life is racing around ${WorldDefinition.label}`,
-      'Watch the wave wrap around the tiny world.',
+      WorldDefinition.memory,
     );
+    if (LandingAccolade) {
+      showStatusToast(`${LandingAccolade} · ${WorldDefinition.label} AWAKENING`, 1450);
+    }
   } else if (WasAlreadyRestored && GamePhase !== 'victory' && GamePhase !== 'victoryPending') {
     GamePhase = 'attached';
-    showStatusToast('SAFE LANDING', 700);
+    showStatusToast(LandingAccolade ?? 'CLEAN LANDING', 700);
     showRouteChoiceInstruction();
   }
 }
 
 /** Lands on the one-use Seedstone without counting it as an awakened world. */
 function attachSeedToSeedstone(ImpactPosition) {
+  const LandingAccolade = getCurrentLandingAccolade(SeedstoneDefinition.id, true);
   const SurfaceRestPosition = calculateSurfaceRestPosition(SeedstoneDefinition, ImpactPosition);
 
   ImpactPulseMesh.material.color.set(0x72d9ff);
@@ -2312,7 +2390,12 @@ function attachSeedToSeedstone(ImpactPosition) {
   LaunchIgnoredWorldIdentifier = null;
   LaunchIgnoredBodyIdentifier = null;
   GamePhase = 'attached';
-  showStatusToast('SEEDSTONE READY · 1 LAUNCH', 1100);
+  GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
+  resetFlightFeedback();
+  showStatusToast(
+    LandingAccolade ? `${LandingAccolade} · SEEDSTONE READY` : 'SEEDSTONE READY · 1 LAUNCH',
+    1100,
+  );
   showInstruction(
     'Temporary launchpad',
     'Choose the next world carefully — the Seedstone crumbles after launch.',
@@ -2326,6 +2409,7 @@ function attachSeedToWorldheart(ImpactPosition) {
   }
 
   const SurfaceRestPosition = calculateSurfaceRestPosition(WorldheartDefinition, ImpactPosition);
+  const LandingAccolade = getCurrentLandingAccolade(WorldheartDefinition.id, true);
   ImpactPulseMesh.material.color.set(0xffd678);
   ImpactPulseMesh.position.set(ImpactPosition.x, ImpactPosition.y, 0.24);
   ImpactPulseMesh.scale.setScalar(1.2);
@@ -2338,6 +2422,8 @@ function attachSeedToWorldheart(ImpactPosition) {
   SeedGroup.position.set(SurfaceRestPosition.x, SurfaceRestPosition.y, SurfaceRestPosition.z);
   CurrentWorldIdentifier = WorldheartDefinition.id;
   WorldheartDefinition.restored = true;
+  GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
+  resetFlightFeedback();
   GamePhase = 'victoryPending';
   updateWorldheartObjective();
   updateVictorySummary();
@@ -2682,6 +2768,9 @@ function handlePointerUp(PointerEventData) {
     0,
   );
   const IsLaunchingFromSeedstone = CurrentWorldIdentifier === SeedstoneDefinition.id;
+  FlightOriginWorldIdentifier = IsLaunchingFromSeedstone ? null : CurrentWorldIdentifier;
+  FlightHadAsteroidClosePass = false;
+  FlightClosePassWorldIdentifiers.clear();
   LaunchIgnoredWorldIdentifier = IsLaunchingFromSeedstone ? null : CurrentWorldIdentifier;
   LaunchIgnoredBodyIdentifier = IsLaunchingFromSeedstone ? SeedstoneDefinition.id : null;
   if (IsLaunchingFromSeedstone) {
@@ -2716,6 +2805,7 @@ function recoverSeedFromVoid(StatusMessage = 'LOST TO THE VOID') {
   }
 
   GamePhase = 'recovering';
+  resetFlightFeedback();
   SeedPhysicsState.velocity = createVector();
   WorldseedSound.failure();
   showStatusToast(StatusMessage, 700);
@@ -2794,6 +2884,8 @@ function simulateSeedFixedStep() {
       }
     }
   }
+
+  updateFlightFeedback();
 
   const CollisionWorldDefinition = findCollidingWorld(
     SeedPhysicsState.position,
@@ -2919,7 +3011,8 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
             WorldseedSound.worldheartOpen();
             showStatusToast('WORLDHEART ROUTE OPEN', 1400);
           } else {
-            showStatusToast(`${WorldDefinition.label} AWAKENED`, 850);
+            GameCanvas.dataset.lastMemory = WorldDefinition.memory;
+            showStatusToast(WorldDefinition.memory, 2100, 'memory');
           }
           if (GamePhase === 'victoryPending') {
             VictoryPanelElement.hidden = false;
@@ -2960,6 +3053,9 @@ function updateFlightAudio() {
   const Speed = Math.hypot(SeedPhysicsState.velocity.x, SeedPhysicsState.velocity.y);
   let NearestSurfaceDistance = Infinity;
   for (const WorldDefinition of WorldDefinitions) {
+    if (WorldDefinition.id === FlightOriginWorldIdentifier) {
+      continue;
+    }
     const OffsetX = SeedPhysicsState.position.x - WorldDefinition.position.x;
     const OffsetY = SeedPhysicsState.position.y - WorldDefinition.position.y;
     const CentreDistance = Math.sqrt((OffsetX * OffsetX) + (OffsetY * OffsetY));
@@ -2968,6 +3064,10 @@ function updateFlightAudio() {
       Math.max(0, CentreDistance - WorldDefinition.radius - SeedRadius),
     );
   }
+  NearestSurfaceDistance = Math.min(
+    NearestSurfaceDistance,
+    Math.max(0, getAsteroidSurfaceClearance()),
+  );
   WorldseedSound.updateFlight(Speed, NearestSurfaceDistance);
 }
 
@@ -3243,8 +3343,12 @@ function resetGame() {
   clearTrajectoryPreview();
   VictoryPanelElement.hidden = true;
   StatusToastElement.classList.remove('is-visible');
+  StatusToastElement.classList.remove('is-memory');
   StatusToastElement.textContent = '';
   WorldseedSound.reset();
+  resetFlightFeedback();
+  GameCanvas.dataset.lastFlightAccolade = '';
+  GameCanvas.dataset.lastMemory = '';
 
   for (const WorldDefinition of WorldDefinitions) {
     WorldDefinition.restored = WorldDefinition.isStartingWorld;
@@ -3362,7 +3466,7 @@ function resetGame() {
   );
   showInstruction(
     'Choose ' + OpeningRouteChoices[0].label + ' or ' + OpeningRouteChoices[1].label,
-    'Grab the seed, pull away from a gold-ringed world, then release.',
+    'Carry the last living seed onward. Pull away from a gold ring, then release.',
   );
 }
 
