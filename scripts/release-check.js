@@ -99,7 +99,16 @@ async function verifyLocalRelease() {
   requirePattern(IndexHtml, /src\/style\.css\?v=[^"']+/, 'index.html stylesheet');
   requirePattern(IndexHtml, /src\/main\.js\?v=[^"']+/, 'index.html module');
   requireText(IndexHtml, '"three": "./vendor/three.module.min.js?v=0.179.1"', 'index.html import map');
+  requireText(IndexHtml, 'aria-describedby="InstructionPanel"', 'canvas instructions');
+  requireText(IndexHtml, 'aria-live="polite" aria-atomic="true"', 'route announcement');
+  requireText(IndexHtml, 'aria-modal="true"', 'completion dialog');
+  requireText(IndexHtml, 'aria-keyshortcuts="M"', 'audio keyboard shortcut');
+  requireText(IndexHtml, 'aria-keyshortcuts="R"', 'reset keyboard shortcut');
   assert.ok(!IndexHtml.includes('cdn.jsdelivr.net'), 'index.html must not require jsDelivr');
+
+  const StyleCss = TextByPath.get('src/style.css');
+  requireText(StyleCss, ':focus-visible', 'visible keyboard focus');
+  requireText(StyleCss, '@media (prefers-reduced-motion: reduce)', 'reduced-motion styling');
 
   const ThreeRuntimeBuffer = await readRequiredFile('vendor/three.module.min.js');
   const ThreeRuntimeSha256 = createHash('sha256').update(ThreeRuntimeBuffer).digest('hex');
@@ -136,6 +145,10 @@ async function verifyLocalRelease() {
   requireText(MainJavaScript, 'getNextAuthoredSystemIdentifier', 'main campaign progression');
   requireText(MainJavaScript, 'continueCampaignOrReplay', 'main Worldheart campaign handoff');
   requireText(MainJavaScript, 'dataset.system = ActiveSystem.id', 'main active-system marker');
+  requireText(MainJavaScript, 'ReducedMotionMediaQuery', 'reduced-motion runtime');
+  requireText(MainJavaScript, 'dataset.pageActive', 'page lifecycle marker');
+  requireText(MainJavaScript, 'dataset.webglAvailable', 'WebGL lifecycle marker');
+  requireText(MainJavaScript, 'ShouldRestoreCanvasFocus', 'completion focus restoration');
 
   const ContentJavaScript = TextByPath.get('src/content.js');
   requireText(ContentJavaScript, 'AuthoredSystemDefinitions', 'authored-system registry');

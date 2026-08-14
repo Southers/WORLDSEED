@@ -195,6 +195,19 @@ The base game remains one-pointer/touch accessible:
 - release to launch;
 - use the same gesture on mouse, pen and touch.
 
+The browser shell supports that gesture without turning rapid aim updates into screen-reader
+noise: the canvas has a concise control description, route instructions are announced as one
+polite atomic update, and the aim meter remains visual. Keyboard focus is visible, `M` and `R`
+are exposed as shortcuts, and completion moves focus into the summary before Replay returns it
+to the canvas. Touch controls keep a 44px minimum target. Reduced-motion preference removes
+camera follow, impact shake and the extended finale animation while preserving the final restored
+state and every deterministic gameplay result.
+
+Lifecycle handling must never advance physics invisibly. A hidden page pauses the render/fixed-step
+loop and cancels an unfinished drag; returning discards the stale clock delta and reframes the
+system. Resize and orientation changes preserve campaign state, while WebGL context loss pauses
+sound and simulation until the renderer reports a restored context.
+
 Do not add a mid-flight action until branching routes and predictable obstacles have been tested without one. If later introduced, it must remain optional, legible and compatible with deterministic simulation.
 
 ## Success criteria
