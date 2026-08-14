@@ -118,8 +118,10 @@ and the final constellation. The silent 10.5-second H.264 review clip now progre
 Starwell, the physical route unlock, the restoration pulse and the campaign resolution using only
 authentic captured frames. Local signature, dimension, duration, codec and package audits pass.
 The live organizer post confirms the deadline, rules, five judging categories and exact reply-based
-entry route; the required playable link and Tiny Worlds explanation are prepared. The public media
-deploy and final release audit remain. Publishing the reply stays user-controlled.
+entry route; the required playable link and Tiny Worlds explanation are prepared. Pages deployment
+31792011265 and the final online audit passed, and every public media file matches its reviewed local
+asset byte-for-byte. Publishing the reply stays user-controlled. A human background/return smoke
+remains called out because the automation browser does not produce a true `document.hidden` change.
 
 ## Validation gate for every milestone
 
