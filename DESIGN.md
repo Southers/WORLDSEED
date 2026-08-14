@@ -38,7 +38,7 @@ Restoration order matters because every awakened world becomes a persistent laun
 
 The campaign is a sequence of authored planetary systems rather than one unbounded procedural universe.
 
-- **Prologue — First Light:** authored Meadow → Ember → Frost establishes the visual bar while Grove, Tide, a one-use Seedstone, the orbiting Wayfarer and a three-mote Arc prove branching routes, persistent launch nodes, deterministic timing windows and optional mastery.
+- **Prologue — First Light:** authored Meadow → Ember → Frost establishes the full-diorama visual bar while Grove's joined roots, Tide's encircling wave crests, a one-use Seedstone, the orbiting Wayfarer and a three-mote Arc prove branching routes, persistent launch nodes, environmental story, deterministic timing windows and optional mastery.
 - **System I — The Broken Belt:** introduces branching destinations, Seedstones and a predictable orbiting asteroid.
 - **System II — The Wandering Garden:** develops moving launch windows, moons and optional route challenges.
 - **System III — The Long Night:** combines longer gravity assists, tighter safe routes and stronger narrative stakes.
@@ -117,6 +117,8 @@ Story is delivered in fragments that coexist with play:
 - environmental landmarks that reveal meaning when restored;
 - a brief system introduction and completion line;
 - a growing constellation map that shows life returning.
+
+First Light demonstrates the environmental grammar without extra exposition. Grove's slow root veins converge on a joined arch—“the roots were still holding hands”—while Tide's moving bands pass beneath repeating crest relief as its moon-pulled rhythm returns. These landmarks share the planet surface draw call, appear through the same impact-driven restoration wave and remain readable regardless of arrival time.
 
 Example awakening lines:
 

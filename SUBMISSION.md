@@ -29,7 +29,7 @@ WORLDSEED is a focused Three.js orbital slingshot game about restoring a miniatu
 Drag the glowing seed backwards and release it into the gravity wells of a connected miniature system. The trajectory preview uses the same deterministic fixed-step simulation as live flight—including the future position of moving hazards—so every curved shot is yours. Land successfully and a luminous restoration wave wraps around the planet from the exact impact point, growing its diorama, atmosphere, motion and music in sequence.
 
 - **One expressive input:** drag and release with mouse, pen or touch.
-- **A connected First Light system:** authored Meadow, volcanic Ember and crystalline Frost plus Grove and Tide route prototypes.
+- **A connected First Light system:** authored Meadow, volcanic Ember and crystalline Frost plus Grove's joined roots and Tide's encircling wave crests.
 - **A trustworthy gravity toy:** prediction and live flight share one deterministic simulation.
 - **Readable tactical routes:** one-use Seedstones create new launch geometry, while orbiting asteroids turn future collisions red before release.
 - **Optional mastery:** a three-mote Arc rewards an expressive Meadow-to-Frost curve, with predicted pickups highlighted before release and tracked for the run.

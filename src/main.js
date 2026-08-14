@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7d';
+import { WorldseedAudio } from './audio.js?v=20260814-7e';
 
 import {
   countRestoredWorlds,
@@ -11,7 +11,7 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260814-7d';
+} from './campaign.js?v=20260814-7e';
 
 import {
   calculateBodyPositionAtTime,
@@ -21,12 +21,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7d';
+} from './physics.js?v=20260814-7e';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7d';
+} from './restoration.js?v=20260814-7e';
 
 /**
  * WORLDSEED — First Light branching-system prototype.
@@ -61,7 +61,7 @@ const ConstellationNodeElements = [...document.querySelectorAll('[data-world-id]
 const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
-GameCanvas.dataset.build = '20260814-7d';
+GameCanvas.dataset.build = '20260814-7e';
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
 const FixedPhysicsStepSeconds = 1 / 120;
@@ -213,6 +213,8 @@ const WorldDefinitions = [
     isStartingWorld: false,
     isPrototypeWorld: true,
     memory: 'The roots were still holding hands.',
+    biomeStyle: 1,
+    accentColor: new THREE.Color(0xc6e886),
     restoration: {
       durationSeconds: 1.85,
       waveWidth: 0.055,
@@ -256,6 +258,8 @@ const WorldDefinitions = [
     isStartingWorld: false,
     isPrototypeWorld: true,
     memory: 'The moon-pulled water found its rhythm.',
+    biomeStyle: 2,
+    accentColor: new THREE.Color(0x9de9df),
     restoration: {
       durationSeconds: 1.95,
       waveWidth: 0.052,
@@ -492,6 +496,9 @@ function createRestorationSurfaceMaterial(WorldDefinition) {
     aliveColor: { value: WorldDefinition.aliveColor.clone() },
     waveColor: { value: WorldDefinition.restoration.waveColor.clone() },
     surfaceVariation: { value: WorldDefinition.restoration.surfaceVariation },
+    accentColor: { value: (WorldDefinition.accentColor ?? WorldDefinition.aliveColor).clone() },
+    biomeStyle: { value: WorldDefinition.biomeStyle ?? 0 },
+    biomeTime: { value: 0 },
   };
   const SurfaceMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -505,30 +512,47 @@ function createRestorationSurfaceMaterial(WorldDefinition) {
     Shader.vertexShader = Shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nvarying vec3 vRestorationNormal;',
+        `#include <common>
+        uniform float restorationProgress;
+        attribute vec3 restorationDirection;
+        attribute float landmarkMask;
+        varying vec3 vRestorationDirection;
+        varying float vLandmarkMask;`,
       )
       .replace(
         '#include <beginnormal_vertex>',
-        '#include <beginnormal_vertex>\nvRestorationNormal = normalize(objectNormal);',
+        `#include <beginnormal_vertex>
+        vRestorationDirection = normalize(restorationDirection);
+        vLandmarkMask = landmarkMask;`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        float landmarkGrowth = smoothstep(-0.02, 0.72, restorationProgress);
+        transformed *= mix(1.0, 0.16 + (landmarkGrowth * 0.84), landmarkMask);`,
       );
     Shader.fragmentShader = Shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
-        varying vec3 vRestorationNormal;
+        varying vec3 vRestorationDirection;
+        varying float vLandmarkMask;
         uniform vec3 restorationOrigin;
         uniform float restorationProgress;
         uniform float restorationWaveWidth;
         uniform vec3 deadColor;
         uniform vec3 aliveColor;
         uniform vec3 waveColor;
-        uniform float surfaceVariation;`,
+        uniform float surfaceVariation;
+        uniform vec3 accentColor;
+        uniform float biomeStyle;
+        uniform float biomeTime;`,
       )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
         float restorationDistance = acos(clamp(dot(
-          normalize(vRestorationNormal),
+          normalize(vRestorationDirection),
           normalize(restorationOrigin)
         ), -1.0, 1.0)) / PI;
         float restoredSurface = 1.0 - smoothstep(
@@ -542,15 +566,32 @@ function createRestorationSurfaceMaterial(WorldDefinition) {
           restorationWaveWidth * 2.2,
           abs(restorationDistance - restorationProgress)
         );
-        float surfacePattern = sin(vRestorationNormal.x * 17.0)
-          * sin(vRestorationNormal.y * 23.0)
-          * sin(vRestorationNormal.z * 19.0);
+        float surfacePattern = sin(vRestorationDirection.x * 17.0)
+          * sin(vRestorationDirection.y * 23.0)
+          * sin(vRestorationDirection.z * 19.0);
         vec3 variedAliveColor = aliveColor * (1.0 + (surfacePattern * surfaceVariation));
+        if (biomeStyle > 0.5 && biomeStyle < 1.5) {
+          float rootVeins = 0.5 + (0.5 * sin(
+            (vRestorationDirection.x * 18.0)
+            + (vRestorationDirection.y * 9.0)
+            + (vRestorationDirection.z * 15.0)
+            + (biomeTime * 0.18)
+          ));
+          variedAliveColor = mix(variedAliveColor, accentColor, rootVeins * 0.34);
+        } else if (biomeStyle > 1.5) {
+          float tideBands = 0.5 + (0.5 * sin(
+            (vRestorationDirection.y * 24.0)
+            + (vRestorationDirection.x * 7.0)
+            + (biomeTime * 0.9)
+          ));
+          variedAliveColor = mix(variedAliveColor, accentColor, tideBands * 0.52);
+        }
+        variedAliveColor = mix(variedAliveColor, accentColor, vLandmarkMask * 0.82);
         diffuseColor.rgb = mix(deadColor, variedAliveColor, restoredSurface);
         diffuseColor.rgb += waveColor * restorationBand * activeRestorationWave * 0.9;`,
       );
   };
-  SurfaceMaterial.customProgramCacheKey = () => 'worldseed-restoration-surface-v1';
+  SurfaceMaterial.customProgramCacheKey = () => 'worldseed-restoration-surface-v2';
 
   return { material: SurfaceMaterial, uniforms: RestorationUniforms };
 }
@@ -710,6 +751,215 @@ function createPlaceholderSurfaceProps(WorldDefinition) {
   }
 
   return SurfacePropGroup;
+}
+
+/** Adds the custom attributes shared by the restoration and landmark-growth shaders. */
+function addRestorationGeometryAttributes(
+  Geometry,
+  FixedRestorationDirection = null,
+  LandmarkMaskValue = 0,
+) {
+  const PositionAttribute = Geometry.getAttribute('position');
+  const RestorationDirections = new Float32Array(PositionAttribute.count * 3);
+  const LandmarkMasks = new Float32Array(PositionAttribute.count);
+
+  for (let VertexIndex = 0; VertexIndex < PositionAttribute.count; VertexIndex += 1) {
+    const AttributeOffset = VertexIndex * 3;
+    if (FixedRestorationDirection) {
+      RestorationDirections[AttributeOffset] = FixedRestorationDirection.x;
+      RestorationDirections[AttributeOffset + 1] = FixedRestorationDirection.y;
+      RestorationDirections[AttributeOffset + 2] = FixedRestorationDirection.z;
+    } else {
+      TemporaryThreeVector.set(
+        PositionAttribute.getX(VertexIndex),
+        PositionAttribute.getY(VertexIndex),
+        PositionAttribute.getZ(VertexIndex),
+      ).normalize();
+      RestorationDirections[AttributeOffset] = TemporaryThreeVector.x;
+      RestorationDirections[AttributeOffset + 1] = TemporaryThreeVector.y;
+      RestorationDirections[AttributeOffset + 2] = TemporaryThreeVector.z;
+    }
+    LandmarkMasks[VertexIndex] = LandmarkMaskValue;
+  }
+
+  Geometry.setAttribute(
+    'restorationDirection',
+    new THREE.BufferAttribute(RestorationDirections, 3),
+  );
+  Geometry.setAttribute('landmarkMask', new THREE.BufferAttribute(LandmarkMasks, 1));
+  return Geometry;
+}
+
+/** Places one geometry on a spherical surface before it enters a merged one-call landmark. */
+function createPlacedLandmarkGeometry(
+  SourceGeometry,
+  SurfaceDirection,
+  WorldRadius,
+  Scale = 1,
+  TangentRotationRadians = 0,
+) {
+  const LandmarkGeometry = SourceGeometry.index
+    ? SourceGeometry.toNonIndexed()
+    : SourceGeometry.clone();
+  const NormalizedDirection = SurfaceDirection.clone().normalize();
+  const Placement = new THREE.Object3D();
+  Placement.position.copy(NormalizedDirection).multiplyScalar(WorldRadius);
+  Placement.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), NormalizedDirection);
+  Placement.rotateY(TangentRotationRadians);
+  Placement.scale.setScalar(Scale);
+  Placement.updateMatrix();
+  LandmarkGeometry.applyMatrix4(Placement.matrix);
+  addRestorationGeometryAttributes(LandmarkGeometry, NormalizedDirection, 1);
+  return LandmarkGeometry;
+}
+
+/** Places a readable front-facing silhouette into the rotating one-call surface mesh. */
+function createFrontLandmarkGeometry(
+  SourceGeometry,
+  WorldRadius,
+  OffsetX = 0,
+  OffsetY = 0,
+  Scale = 1,
+  RotationRadians = 0,
+  SurfaceYawRadians = 0,
+) {
+  const LandmarkGeometry = SourceGeometry.index
+    ? SourceGeometry.toNonIndexed()
+    : SourceGeometry.clone();
+  const Placement = new THREE.Object3D();
+  Placement.position.set(OffsetX, OffsetY, WorldRadius);
+  Placement.rotation.z = RotationRadians;
+  Placement.scale.setScalar(Scale);
+  Placement.updateMatrix();
+  LandmarkGeometry.applyMatrix4(Placement.matrix);
+  LandmarkGeometry.rotateY(SurfaceYawRadians);
+  addRestorationGeometryAttributes(
+    LandmarkGeometry,
+    new THREE.Vector3(Math.sin(SurfaceYawRadians), 0, Math.cos(SurfaceYawRadians)),
+    1,
+  );
+  return LandmarkGeometry;
+}
+
+/** Merges compatible non-indexed geometries into one surface draw call. */
+function mergeRestorationGeometries(Geometries) {
+  const AttributeNames = ['position', 'normal', 'restorationDirection', 'landmarkMask'];
+  const MergedGeometry = new THREE.BufferGeometry();
+
+  for (const AttributeName of AttributeNames) {
+    const ItemSize = Geometries[0].getAttribute(AttributeName).itemSize;
+    const TotalValueCount = Geometries.reduce(
+      (ValueCount, Geometry) => ValueCount + Geometry.getAttribute(AttributeName).array.length,
+      0,
+    );
+    const MergedValues = new Float32Array(TotalValueCount);
+    let ValueOffset = 0;
+    for (const Geometry of Geometries) {
+      const SourceValues = Geometry.getAttribute(AttributeName).array;
+      MergedValues.set(SourceValues, ValueOffset);
+      ValueOffset += SourceValues.length;
+    }
+    MergedGeometry.setAttribute(AttributeName, new THREE.BufferAttribute(MergedValues, ItemSize));
+  }
+
+  MergedGeometry.computeBoundingSphere();
+  for (const Geometry of Geometries) {
+    Geometry.dispose();
+  }
+  return MergedGeometry;
+}
+
+/** Builds Grove's joined-root arch and clustered saplings into its existing surface call. */
+function createGroveSurfaceGeometry(WorldDefinition) {
+  const BaseSourceGeometry = new THREE.IcosahedronGeometry(WorldDefinition.radius, 3);
+  const BaseGeometry = BaseSourceGeometry.index
+    ? BaseSourceGeometry.toNonIndexed()
+    : BaseSourceGeometry.clone();
+  BaseSourceGeometry.dispose();
+  addRestorationGeometryAttributes(BaseGeometry);
+  const Geometries = [BaseGeometry];
+
+  const RootArchSource = new THREE.TorusGeometry(0.92, 0.14, 5, 20, Math.PI);
+  Geometries.push(createFrontLandmarkGeometry(
+    RootArchSource,
+    WorldDefinition.radius - 0.04,
+    0,
+    -0.12,
+    1,
+    -0.08,
+  ));
+
+  const TrunkSource = new THREE.CylinderGeometry(0.085, 0.13, 0.68, 6);
+  TrunkSource.translate(0, 0.34, 0);
+  const CanopySource = new THREE.IcosahedronGeometry(0.34, 1);
+  CanopySource.translate(0, 0.82, 0);
+  const SaplingDirections = [
+    new THREE.Vector3(-0.45, 0.1, 0.9),
+    new THREE.Vector3(0.42, 0.16, 0.9),
+    new THREE.Vector3(0, -0.38, 0.92),
+  ];
+  SaplingDirections.forEach((SurfaceDirection, SaplingIndex) => {
+    const SaplingScale = 0.95 + (SaplingIndex * 0.11);
+    Geometries.push(createPlacedLandmarkGeometry(
+      TrunkSource,
+      SurfaceDirection,
+      WorldDefinition.radius,
+      SaplingScale,
+      SaplingIndex * 0.7,
+    ));
+    Geometries.push(createPlacedLandmarkGeometry(
+      CanopySource,
+      SurfaceDirection,
+      WorldDefinition.radius,
+      SaplingScale,
+      SaplingIndex * 0.7,
+    ));
+  });
+
+  RootArchSource.dispose();
+  TrunkSource.dispose();
+  CanopySource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Tide's three repeating wave crests into its existing surface call. */
+function createTideSurfaceGeometry(WorldDefinition) {
+  const BaseSourceGeometry = new THREE.IcosahedronGeometry(WorldDefinition.radius, 3);
+  const BaseGeometry = BaseSourceGeometry.index
+    ? BaseSourceGeometry.toNonIndexed()
+    : BaseSourceGeometry.clone();
+  BaseSourceGeometry.dispose();
+  addRestorationGeometryAttributes(BaseGeometry);
+  const Geometries = [BaseGeometry];
+  const WaveCrestSource = new THREE.TorusGeometry(0.75, 0.16, 5, 18, Math.PI);
+  const WaveCrestRows = [
+    { y: 0.52, scale: 0.7, rotation: 0.08 },
+    { y: 0, scale: 0.86, rotation: 0 },
+    { y: -0.52, scale: 0.72, rotation: -0.08 },
+  ];
+  const WaveClusterYaws = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
+  WaveClusterYaws.forEach((WaveClusterYaw) => {
+    WaveCrestRows.forEach((WaveCrestRow) => {
+      Geometries.push(createFrontLandmarkGeometry(
+        WaveCrestSource,
+        WorldDefinition.radius + 0.18,
+        0,
+        WaveCrestRow.y,
+        WaveCrestRow.scale,
+        WaveCrestRow.rotation,
+        WaveClusterYaw,
+      ));
+    });
+  });
+  WaveCrestSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Selects the one-call authored geometry used by a lightweight First Light route world. */
+function createPrototypeSurfaceGeometry(WorldDefinition) {
+  return WorldDefinition.id === 'grove'
+    ? createGroveSurfaceGeometry(WorldDefinition)
+    : createTideSurfaceGeometry(WorldDefinition);
 }
 
 /** Creates Meadow's authored low-poly cottage landmark. */
@@ -1349,14 +1599,16 @@ function createWorld(WorldDefinition) {
     WorldDefinition.position.z,
   );
 
-  const SurfaceGeometry = new THREE.IcosahedronGeometry(
-    WorldDefinition.radius,
-    WorldDefinition.isPrototypeWorld ? 3 : 5,
-  );
+  const SurfaceGeometry = WorldDefinition.isPrototypeWorld
+    ? createPrototypeSurfaceGeometry(WorldDefinition)
+    : addRestorationGeometryAttributes(new THREE.IcosahedronGeometry(
+      WorldDefinition.radius,
+      5,
+    ));
   const SurfaceRestoration = createRestorationSurfaceMaterial(WorldDefinition);
   const SurfaceMaterial = SurfaceRestoration.material;
   const SurfaceMesh = new THREE.Mesh(SurfaceGeometry, SurfaceMaterial);
-  SurfaceMesh.castShadow = true;
+  SurfaceMesh.castShadow = !WorldDefinition.isPrototypeWorld;
   SurfaceMesh.receiveShadow = true;
   WorldGroup.add(SurfaceMesh);
 
@@ -3076,6 +3328,11 @@ function updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds) {
   const MeadowRuntime = WorldRuntimeByIdentifier.get('meadow');
   const EmberRuntime = WorldRuntimeByIdentifier.get('ember');
   const FrostRuntime = WorldRuntimeByIdentifier.get('frost');
+  const GroveRuntime = WorldRuntimeByIdentifier.get('grove');
+  const TideRuntime = WorldRuntimeByIdentifier.get('tide');
+
+  GroveRuntime.restorationUniforms.biomeTime.value = ElapsedTimeSeconds;
+  TideRuntime.restorationUniforms.biomeTime.value = ElapsedTimeSeconds;
 
   for (const SurfacePropObject of MeadowRuntime.surfaceMarkerGroup.children) {
     if (SurfacePropObject.userData.swayAmount) {

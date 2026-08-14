@@ -4,7 +4,7 @@
 
 WORLDSEED began as a focused Three.js **Tiny Worlds** prototype and is now growing into an authored planetary campaign. It is a one-input orbital slingshot game: drag the living seed backwards, release it into the gravity wells of miniature planets, choose where to land, and rebuild a connected constellation one awakening at a time.
 
-The polished Meadow → Ember → Frost journey is the prologue and visual benchmark. The current First Light prototype adds Grove and Tide as lightweight route-test worlds, a one-use Seedstone launchpad, a deterministic orbiting asteroid, a three-mote optional Arc and a physical Worldheart exit. Together they prove branching routes, persistent launch nodes, readable timing decisions, trustworthy mastery feedback and an understandable system objective before the wider campaign is built.
+The polished Meadow → Ember → Frost journey is the prologue and visual benchmark. The current First Light prototype adds Grove and Tide as lightweight authored route worlds, a one-use Seedstone launchpad, a deterministic orbiting asteroid, a three-mote optional Arc and a physical Worldheart exit. Together they prove branching routes, persistent launch nodes, readable timing decisions, trustworthy mastery feedback and an understandable system objective before the wider campaign is built.
 
 ## Play
 
@@ -16,7 +16,7 @@ Use a clean browser at a desktop viewport and again at a portrait mobile viewpor
 
 1. Confirm five worlds, the glowing seed, two gold route rings, three cyan stardust motes, the blue `SEEDSTONE · 1 USE` and the labelled orbiting asteroid render without console errors. Confirm the HUD reads `WORLDS 0 / 4 · ARC 0 / 3` and the separate Worldheart objective reads `0 / 3` without overlap.
 2. Land on the Seedstone; confirm the counter remains `0 / 4`, the next world suggestions are shown from its new launch position, and the stone disappears after one launch.
-3. Land on Grove first; confirm `1 / 4` and that the next suggestions become FROST/EMBER. Reset, land on Ember first, and confirm the next suggestions instead become TIDE/FROST.
+3. Land on Grove first; confirm its joined-root arch, saplings and slow root-vein pattern awaken, `1 / 4` is shown and the next suggestions become FROST/EMBER. Reset, reach Tide through Ember or a gravity assist, and confirm its moving water bands and repeating crest relief awaken without losing the route UI.
 4. Aim across the asteroid's visible orbit; confirm a future collision turns the prediction red. Release and confirm `ASTEROID IMPACT`, fast recovery to the last restored world, and that waiting can open the same route.
 5. Aim the expressive Meadow-to-Frost arc through the three motes; confirm the predicted motes turn gold and the outcome reports `ARC +3`. Release in a clear Wayfarer window, then confirm live flight collects exactly `3 / 3` and awakens Frost.
 6. Launch into empty space; confirm the seed returns to its last world in under one second after leaving the play area.
@@ -43,7 +43,7 @@ The current build includes:
 - a compact three-world Worldheart threshold, gold physical exit shot and honest Heart/Bloom/Arc completion summary;
 - a concise awakening memory for every world, shown inside the existing restoration flow without pausing control;
 - deterministic `CLOSE PASS`, `GRAVITY ASSIST` and `CLEAN LANDING` accolades derived from the successful live flight;
-- lightweight Grove and Tide route prototypes alongside the three authored worlds;
+- one-call Grove root-arch and Tide wave-crest landmarks with animated biome patterns alongside the three benchmark worlds;
 - world collisions and landing;
 - configurable planet-wrapping restoration waves driven by spherical distance from impact;
 - staged surface growth, atmosphere bloom and world motion behind each restoration wave;
@@ -59,9 +59,9 @@ The current build includes:
 - mobile-friendly pointer input;
 - framework-free physics tests.
 
-Meadow, Ember and Frost meet the authored diorama and mobile-scale silhouette bar. Grove and Tide intentionally remain low-cost greybox spheres: their purpose is to prove that choosing a destination, changing launch position and routing through restored worlds is fun before they receive final art.
+Meadow, Ember and Frost remain the full diorama benchmark. Grove and Tide now carry a deliberate lightweight identity without spending extra draw calls: Grove reveals a joined-root arch, clustered saplings and slow root veins, while Tide reveals moving water bands and repeating crest relief around its circumference. They remain compact route worlds rather than full dioramas, preserving room for the larger authored systems.
 
-The current playable build is the tactical First Light prototype. Grove-first recommends Frost/Ember next, while Ember-first recommends Tide/Frost; every world remains physically landable regardless of the suggestion. The Seedstone creates an optional setup route, while the asteroid turns launch timing into a visible decision instead of a random failure. The Arc places three optional motes on an expressive Meadow-to-Frost curve: prediction promises the pickup count, and timing Wayfarer determines whether the player completes it. Three awakenings open the Worldheart route; entering it completes Heart immediately, while all four worlds and all three motes separately earn Bloom and Arc. The Worldheart checkpoint completed its desktop and 390×844 portrait-mobile release gates; the measured portrait run peaked at 179 draw calls and reset cleanly through Play again with no console warnings or errors.
+The current playable build is the tactical First Light prototype. Grove-first recommends Frost/Ember next, while Ember-first recommends Tide/Frost; every world remains physically landable regardless of the suggestion. The Seedstone creates an optional setup route, while the asteroid turns launch timing into a visible decision instead of a random failure. The Arc places three optional motes on an expressive Meadow-to-Frost curve: prediction promises the pickup count, and timing Wayfarer determines whether the player completes it. Three awakenings open the Worldheart route; entering it completes Heart immediately, while all four worlds and all three motes separately earn Bloom and Arc. The environmental-story checkpoint completed desktop Grove and 390×844 portrait-mobile Tide landings, deliberate void recovery, reset and a full mobile Worldheart run. The measured run peaked at 179 draw calls with a clean final console.
 
 ### Visual budget
 
