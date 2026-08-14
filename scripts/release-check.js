@@ -133,10 +133,13 @@ async function verifyLocalRelease() {
   requirePattern(MainJavaScript, /\.\/restoration\.js\?v=[^"']+/, 'main restoration import');
   requireText(MainJavaScript, "dataset.build = '", 'main build marker');
   requireText(MainJavaScript, 'getAuthoredSystemDefinition', 'main authored-system selection');
+  requireText(MainJavaScript, 'getNextAuthoredSystemIdentifier', 'main campaign progression');
+  requireText(MainJavaScript, 'continueCampaignOrReplay', 'main Worldheart campaign handoff');
   requireText(MainJavaScript, 'dataset.system = ActiveSystem.id', 'main active-system marker');
 
   const ContentJavaScript = TextByPath.get('src/content.js');
   requireText(ContentJavaScript, 'AuthoredSystemDefinitions', 'authored-system registry');
+  requireText(ContentJavaScript, 'AuthoredCampaignSystemIdentifiers', 'authored campaign order');
   requireText(ContentJavaScript, "id: 'broken-belt'", 'Broken Belt authored content');
   requireText(ContentJavaScript, 'completion:', 'authored completion presentation');
   requireText(ContentJavaScript, 'constellation:', 'authored constellation presentation');

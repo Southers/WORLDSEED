@@ -83,6 +83,8 @@ Playable slice checkpoint: Broken Belt now contains six authored worlds—Relay,
 
 Exit: the campaign sustains choice, mastery and emotional progression across multiple systems.
 
+Progression checkpoint: First Light's Worldheart summary now offers an explicit continuation into Broken Belt, while the current campaign frontier offers a chapter replay. Both use the same authored-system registry and URL entry path, so direct chapter links, recovery and browser smoke tests remain available without a second game loop. Wandering Garden and Long Night content remain the next checkpoints.
+
 ## Milestone 7 — Worldheart finale, polish and submission readiness
 
 - Build a final system that recombines the established route vocabulary.

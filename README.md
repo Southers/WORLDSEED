@@ -71,6 +71,8 @@ The current playable build is the tactical First Light prototype and compatibili
 
 Broken Belt is the first content-pipeline chapter. Relay opens toward the safe direct Kiln route or the higher Loom route, whose curved prediction collects all three Arc motes. Kiln continues naturally toward Drift, while Vault offers a compact setup angle toward Shard and the Belt Heart. Three awakenings open the exit; Shard and Loom remain optional depending on route order, so Heart, Bloom and Arc represent genuinely different goals. Browser evidence covers both desktop openings and a complete 390×844 Relay → Kiln → Drift → Vault → Shard → Belt Heart run at 22 peak draw calls.
 
+Completing First Light now offers **Continue to BROKEN BELT** in the Worldheart summary. Completing the current campaign frontier offers **Replay BROKEN BELT** instead, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
+
 ### Visual budget
 
 - Keep the complete scene below roughly 180 draw calls during a restoration wave.

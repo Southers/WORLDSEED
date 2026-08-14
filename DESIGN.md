@@ -46,6 +46,8 @@ The campaign is a sequence of authored planetary systems rather than one unbound
 
 Names and world counts are provisional. Each system must earn its place through a distinct spatial problem and awakening identity.
 
+Worldheart completion is the campaign handoff. When another authored chapter exists, the completion panel explicitly offers **Continue to [system]** and reloads through the same registry-backed entry path; at the current campaign frontier it offers a chapter replay instead. Direct `?system=<id>` links remain valid for testing and replay, but the default journey begins at First Light and advances in authored order.
+
 ## Authored-system contract
 
 `src/content.js` is the campaign's pure-data boundary. Every system definition owns:

@@ -649,8 +649,21 @@ export const AuthoredSystemDefinitions = {
   [BrokenBeltSystemDefinition.id]: BrokenBeltSystemDefinition,
 };
 
+export const AuthoredCampaignSystemIdentifiers = [
+  FirstLightSystemDefinition.id,
+  BrokenBeltSystemDefinition.id,
+];
+
 /** Resolves a requested authored system and safely falls back to the campaign entry. */
 export function getAuthoredSystemDefinition(SystemIdentifier) {
   return AuthoredSystemDefinitions[SystemIdentifier]
     ?? AuthoredSystemDefinitions[DefaultAuthoredSystemIdentifier];
+}
+
+/** Returns the next authored chapter, or null when the current campaign frontier is reached. */
+export function getNextAuthoredSystemIdentifier(SystemIdentifier) {
+  const CurrentSystemIndex = AuthoredCampaignSystemIdentifiers.indexOf(SystemIdentifier);
+  return CurrentSystemIndex >= 0
+    ? AuthoredCampaignSystemIdentifiers[CurrentSystemIndex + 1] ?? null
+    : null;
 }
