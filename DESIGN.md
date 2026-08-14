@@ -70,6 +70,10 @@ Wandering Garden uses the same one-call restoration tier without reusing the Bel
 
 Long Night darkens the authored environment while preserving landing readability. Vigil's watchfires, Pyre's swept flames, Hollow's empty bells, Beacon's star rays, Umbra's crescents and Lumen's prism all grow through the same restoration surface. Its wider placement and heavier Beacon well create long arcs without changing controls or simulation rules.
 
+Worldheart deliberately echoes, then resolves, that vocabulary. Confluence branches toward the readable Kindle line or the four-second Memory commitment; Memory can route through an orbiting one-use Moon; the full three-mote arc bends into the heavy Starwell only when Last Shadow clears; and four awakenings make the physical core the first suggested route from every surviving launch node. The six one-call silhouettes recombine arches, roots, flames, signal rings, petals, star fins and prisms instead of introducing an unrelated visual language.
+
+The core landing is the campaign's largest restoration beat. It settles gameplay state immediately, then spends 3.4 seconds sending gold route lines from the core to every restored world, expanding pooled pulse rings and deterministic sparks through the system, and warming the authored environment before the final constellation summary appears. The effect is presentation-only and adds four pooled draw calls; it does not fork or delay the shared physics result.
+
 A new system should therefore require one data definition plus deliberately registered visual factories. It must not require a second physics implementation, per-system branches throughout the game loop or duplicated prediction logic. First Light is the behavioural compatibility fixture for this contract.
 
 Authored definitions live in a small campaign registry. During development, `?system=<id>` selects a registered chapter and an unknown identifier safely falls back to First Light. The active system identifier is exposed on the game canvas for release and browser verification; campaign progression will choose from the same registry rather than maintaining a second content path.
@@ -160,6 +164,8 @@ Broken Belt's fragments reveal a system that continued trying to communicate aft
 Wandering Garden answers that signal with movement rather than machinery. Its shelter saved one leaf, its lamp-flower opens to the void, its branches remember rain and its smallest Nest keeps a place for travellers. Reconnecting the Garden Heart sends the first living pulse toward the Long Night.
 
 Long Night raises the stakes without a cutscene: its watchfire refused to die, its bells waited for an unseen dawn, its shadow protected light and its buried star opens one patient eye. Reconnecting the Night Heart aligns every restored system toward the Worldheart beyond it.
+
+At the Worldheart, those fragments recognise one another: the first spark meets the last watchfire, roots and bridges repeat the same promise, gravity turns every small kindness into a road, and dawn becomes every world choosing to answer. Reconnecting the core resolves the premise in one line: the last living seed is no longer the last.
 
 The campaign premise is simple:
 

@@ -84,6 +84,19 @@ export function validateAuthoredSystemDefinition(SystemDefinition) {
       Errors.push('Authored system environment has invalid fog or exposure ranges.');
     }
   }
+  if (SystemDefinition.finale) {
+    if (SystemDefinition.finale.isCampaignFinale !== true) {
+      Errors.push('Authored finale must declare isCampaignFinale.');
+    }
+    if (
+      !(SystemDefinition.finale.victoryDelaySeconds >= 1.5)
+      || !(SystemDefinition.finale.victoryDelaySeconds <= 6)
+      || !isColorValue(SystemDefinition.finale.pulseColor)
+      || !isColorValue(SystemDefinition.finale.awakenedBackgroundColor)
+    ) {
+      Errors.push('Authored finale has invalid timing or colour data.');
+    }
+  }
   const CompletionDefinition = SystemDefinition.completion;
   for (const CompletionField of [
     'eyebrow', 'title', 'perfectTitle', 'body', 'perfectBody',
@@ -395,6 +408,15 @@ export function createAuthoredSystemRuntime(
       fillLightColor: createColor(EnvironmentDefinition.fillLightColor),
       rimLightColor: createColor(EnvironmentDefinition.rimLightColor),
     },
+    finale: SystemDefinition.finale
+      ? {
+        ...SystemDefinition.finale,
+        pulseColor: createColor(SystemDefinition.finale.pulseColor),
+        awakenedBackgroundColor: createColor(
+          SystemDefinition.finale.awakenedBackgroundColor,
+        ),
+      }
+      : null,
     completion: { ...SystemDefinition.completion },
     constellation: {
       nodes: SystemDefinition.constellation.nodes.map((NodeDefinition) => ({
@@ -990,6 +1012,171 @@ export const LongNightSystemDefinition = {
   ],
 };
 
+/** The campaign finale, recombining every learned route decision around the true Worldheart. */
+export const WorldheartSystemDefinition = {
+  id: 'worldheart',
+  label: 'WORLDHEART',
+  openingBody: 'Every restored system is behind you. Choose how the last living seed comes home.',
+  environment: {
+    backgroundColor: 0x070616,
+    fogColor: 0x0b0920,
+    fogDensity: 0.011,
+    hemisphereSkyColor: 0x8d83b8,
+    hemisphereGroundColor: 0x171126,
+    keyLightColor: 0xffedd0,
+    fillLightColor: 0x776bb4,
+    rimLightColor: 0xa9e8d0,
+    toneMappingExposure: 1.18,
+  },
+  finale: {
+    isCampaignFinale: true,
+    victoryDelaySeconds: 3.4,
+    pulseColor: 0xffe0a0,
+    awakenedBackgroundColor: 0x19152f,
+  },
+  completion: {
+    eyebrow: 'THE WORLDHEART LIVES',
+    title: 'Life has a way home again.',
+    perfectTitle: 'Every world answers the seed.',
+    body: 'The forgotten systems breathe together. The last living seed is no longer the last.',
+    perfectBody: 'Every route, memory and mote now shines in one living constellation.',
+  },
+  constellation: {
+    nodes: [
+      { id: 'confluence', label: 'Confluence', x: 22, y: 72 },
+      { id: 'memory', label: 'Memory', x: 56, y: 34 },
+      { id: 'starwell', label: 'Starwell', x: 112, y: 14 },
+      { id: 'dawn', label: 'Dawn', x: 178, y: 28 },
+      { id: 'kindle', label: 'Kindle', x: 112, y: 72 },
+      { id: 'chorus', label: 'Chorus', x: 108, y: 46 },
+      { id: 'worldheart-core', label: 'Worldheart', x: 216, y: 68, isHeart: true },
+    ],
+    edges: [
+      ['confluence', 'memory'], ['confluence', 'kindle'], ['memory', 'starwell'],
+      ['memory', 'chorus'], ['kindle', 'chorus'], ['kindle', 'dawn'],
+      ['chorus', 'starwell'], ['chorus', 'dawn'], ['starwell', 'dawn'],
+      ['starwell', 'worldheart-core'], ['dawn', 'worldheart-core'],
+    ],
+  },
+  startingWorldIdentifier: 'confluence',
+  openingGuideTargetIdentifier: 'kindle',
+  worldheartUnlockThreshold: 4,
+  routeSuggestions: {
+    confluence: ['worldheart-core', 'memory', 'kindle'],
+    memory: ['worldheart-core', 'memory-moon', 'starwell', 'chorus', 'kindle'],
+    kindle: ['worldheart-core', 'chorus', 'dawn', 'memory-moon', 'memory'],
+    chorus: ['worldheart-core', 'memory-moon', 'dawn', 'starwell', 'kindle'],
+    starwell: ['worldheart-core', 'dawn', 'memory', 'chorus'],
+    dawn: ['worldheart-core', 'starwell', 'kindle', 'chorus'],
+    'memory-moon': ['worldheart-core', 'starwell', 'dawn', 'chorus'],
+  },
+  worlds: [
+    {
+      id: 'confluence', label: 'CONFLUENCE', visualKey: 'confluence',
+      position: { x: -9, y: -7, z: 0 }, radius: 3.15, gravitationalParameter: 90,
+      aliveColor: 0x5e8178, atmosphereColor: 0xa9e8d0, accentColor: 0xffdda0,
+      initiallyRestored: true, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'Every path you restored was already flowing toward this place.',
+      restoration: {
+        durationSeconds: 2.35, waveWidth: 0.044, growthTrailWidth: 0.18,
+        waveColor: 0xe9f1bd, atmosphereOpacity: 0, rotationSpeed: 0.00042,
+        surfaceVariation: 0.075,
+      },
+    },
+    {
+      id: 'kindle', label: 'KINDLE', visualKey: 'kindle',
+      position: { x: 9, y: -5.6, z: 0 }, radius: 2.6, gravitationalParameter: 72,
+      aliveColor: 0xa55f50, atmosphereColor: 0xffad82, accentColor: 0xffe09d,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'The first spark and the last watchfire recognised one another.',
+      restoration: {
+        durationSeconds: 2.3, waveWidth: 0.05, growthTrailWidth: 0.18,
+        waveColor: 0xffcd94, atmosphereOpacity: 0, rotationSpeed: 0.00105,
+        surfaceVariation: 0.045,
+      },
+    },
+    {
+      id: 'memory', label: 'MEMORY', visualKey: 'memory',
+      position: { x: -9.5, y: 3.8, z: 0 }, radius: 2.2, gravitationalParameter: 50,
+      aliveColor: 0x668777, atmosphereColor: 0xbbe2ca, accentColor: 0xe2edc2,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'Roots, bridges and bells had kept the same promise in different words.',
+      restoration: {
+        durationSeconds: 2.05, waveWidth: 0.054, growthTrailWidth: 0.2,
+        waveColor: 0xd8efcf, atmosphereOpacity: 0, rotationSpeed: 0.00064,
+        surfaceVariation: 0.065,
+      },
+    },
+    {
+      id: 'starwell', label: 'STARWELL', visualKey: 'starwell',
+      position: { x: 0, y: 8.3, z: 0 }, radius: 4.1, gravitationalParameter: 145,
+      aliveColor: 0x817cac, atmosphereColor: 0xd8d0ff, accentColor: 0xffe7a5,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'The gravity of every small kindness became a road through the dark.',
+      restoration: {
+        durationSeconds: 2.9, waveWidth: 0.04, growthTrailWidth: 0.2,
+        waveColor: 0xf0e5ff, atmosphereOpacity: 0, rotationSpeed: 0.00086,
+        surfaceVariation: 0.035,
+      },
+    },
+    {
+      id: 'dawn', label: 'DAWN', visualKey: 'dawn',
+      position: { x: 10, y: 6.8, z: 0 }, radius: 2.4, gravitationalParameter: 60,
+      aliveColor: 0xb18461, atmosphereColor: 0xffd7a6, accentColor: 0xfff1b3,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'Dawn was not a place. It was every world choosing to answer.',
+      restoration: {
+        durationSeconds: 2.18, waveWidth: 0.05, growthTrailWidth: 0.2,
+        waveColor: 0xffe7b6, atmosphereOpacity: 0, rotationSpeed: 0.00078,
+        surfaceVariation: 0.05,
+      },
+    },
+    {
+      id: 'chorus', label: 'CHORUS', visualKey: 'chorus',
+      position: { x: 3.2, y: 0.6, z: 0 }, radius: 1.5, gravitationalParameter: 21,
+      aliveColor: 0x7e9171, atmosphereColor: 0xcfe6ae, accentColor: 0xffedaa,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'No world had survived alone; together, they became a song.',
+      restoration: {
+        durationSeconds: 1.82, waveWidth: 0.06, growthTrailWidth: 0.22,
+        waveColor: 0xe9efb5, atmosphereOpacity: 0, rotationSpeed: 0.00056,
+        surfaceVariation: 0.06,
+      },
+    },
+  ],
+  tacticalBodies: [
+    {
+      id: 'memory-moon', label: 'MEMORY MOON', kind: 'seedstone',
+      position: { x: 0.65, y: 0.6, z: 0 }, radius: 0.82, uses: 1,
+      countsTowardRestoration: false, isRouteDestination: true,
+      routeAvailableInitially: true,
+      orbit: {
+        centre: { x: 3.2, y: 0.6, z: 0 }, radius: 2.55,
+        phaseRadians: Math.PI, angularSpeedRadiansPerSecond: 0.22,
+      },
+    },
+    {
+      id: 'last-shadow', label: 'LAST SHADOW', kind: 'hazard', radius: 0.74,
+      countsTowardRestoration: false,
+      orbit: {
+        centre: { x: 0, y: 8.3, z: 0 }, radius: 5.8,
+        phaseRadians: 2.8, angularSpeedRadiansPerSecond: 0.24,
+      },
+    },
+    {
+      id: 'worldheart-core', label: 'WORLDHEART', kind: 'worldheart',
+      position: { x: -5.2, y: 9.5, z: 0 }, radius: 1.18,
+      initiallyRestored: false, countsTowardRestoration: false,
+      isRouteDestination: true, routeAvailableInitially: false,
+    },
+  ],
+  stardust: [
+    { id: 'worldheart-arc-1', position: { x: -3.12, y: -3.78, z: 0 } },
+    { id: 'worldheart-arc-2', position: { x: -3.43, y: -1.22, z: 0 } },
+    { id: 'worldheart-arc-3', position: { x: -3.81, y: 1.65, z: 0 } },
+  ],
+};
+
 export const DefaultAuthoredSystemIdentifier = FirstLightSystemDefinition.id;
 
 export const AuthoredSystemDefinitions = {
@@ -997,6 +1184,7 @@ export const AuthoredSystemDefinitions = {
   [BrokenBeltSystemDefinition.id]: BrokenBeltSystemDefinition,
   [WanderingGardenSystemDefinition.id]: WanderingGardenSystemDefinition,
   [LongNightSystemDefinition.id]: LongNightSystemDefinition,
+  [WorldheartSystemDefinition.id]: WorldheartSystemDefinition,
 };
 
 export const AuthoredCampaignSystemIdentifiers = [
@@ -1004,6 +1192,7 @@ export const AuthoredCampaignSystemIdentifiers = [
   BrokenBeltSystemDefinition.id,
   WanderingGardenSystemDefinition.id,
   LongNightSystemDefinition.id,
+  WorldheartSystemDefinition.id,
 ];
 
 /** Resolves a requested authored system and safely falls back to the campaign entry. */

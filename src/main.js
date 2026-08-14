@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7q';
+import { WorldseedAudio } from './audio.js?v=20260814-7r';
 
 import {
   DefaultAuthoredSystemIdentifier,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
   getNextAuthoredSystemIdentifier,
-} from './content.js?v=20260814-7q';
+} from './content.js?v=20260814-7r';
 
 import {
   countRestoredWorlds,
@@ -19,7 +19,7 @@ import {
   isSystemRestored,
   isWorldheartUnlocked,
   rollbackFlightPickups,
-} from './campaign.js?v=20260814-7q';
+} from './campaign.js?v=20260814-7r';
 
 import {
   calculateBodyPositionAtTime,
@@ -29,12 +29,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7q';
+} from './physics.js?v=20260814-7r';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7q';
+} from './restoration.js?v=20260814-7r';
 
 const RequestedSystemIdentifier = new URLSearchParams(window.location.search).get('system')
   ?? DefaultAuthoredSystemIdentifier;
@@ -102,7 +102,7 @@ const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
 configureSystemInterface();
-GameCanvas.dataset.build = '20260814-7q';
+GameCanvas.dataset.build = '20260814-7r';
 GameCanvas.dataset.system = ActiveSystem.id;
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
@@ -191,6 +191,7 @@ let SeedstoneUsesRemaining = SeedstoneDefinition.uses;
 let SeedstoneCrumbleStartedAtSeconds = null;
 let AttachedSeedstoneSurfaceOffset = null;
 let WorldheartJustUnlocked = false;
+let FinaleRestorationStartedAtSeconds = null;
 let PredictedStardustIdentifiers = new Set();
 const FlightCollectedStardustIdentifiers = new Set();
 let FlightOriginWorldIdentifier = null;
@@ -209,6 +210,8 @@ const ShaderMotionVisualKeys = ['grove', 'tide'];
 const DeadWorldColor = new THREE.Color(0x575d60);
 const DarkWorldColor = new THREE.Color(0x2c3337);
 const RestorableWorldCount = getRestorableWorlds(WorldDefinitions).length;
+const IsCampaignFinale = ActiveSystem.finale?.isCampaignFinale === true;
+const InitialSceneBackgroundColor = ActiveSystem.environment.backgroundColor.clone();
 
 /** Builds system-specific objective and completion UI from authored content. */
 function configureSystemInterface() {
@@ -1326,6 +1329,137 @@ function createLumenSurfaceGeometry(WorldDefinition) {
   return mergeRestorationGeometries(Geometries);
 }
 
+/** Braids restored route arches into the finale's starting confluence. */
+function createConfluenceSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const ArchSource = new THREE.TorusGeometry(0.88, 0.11, 5, 22, Math.PI * 1.35);
+  [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5].forEach((ArchYaw, ArchIndex) => {
+    Geometries.push(createFrontLandmarkGeometry(
+      ArchSource,
+      WorldDefinition.radius + 0.1,
+      ArchIndex % 2 === 0 ? -0.18 : 0.18,
+      -0.06,
+      0.92 + ((ArchIndex % 2) * 0.08),
+      ArchIndex % 2 === 0 ? -0.22 : 0.22,
+      ArchYaw,
+    ));
+  });
+  ArchSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Encircles a familiar flame crown with the Belt's remembered signal ring. */
+function createKindleSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const FlameSource = new THREE.ConeGeometry(0.32, 1.36, 6);
+  FlameSource.translate(0, 0.68, 0);
+  const HaloSource = new THREE.TorusGeometry(WorldDefinition.radius * 1.06, 0.08, 5, 38);
+  const FlameDirections = [
+    new THREE.Vector3(-0.5, 0.34, 0.82), new THREE.Vector3(0, 0.66, 0.78),
+    new THREE.Vector3(0.5, 0.34, 0.82), new THREE.Vector3(0.38, -0.38, 0.88),
+    new THREE.Vector3(-0.38, -0.38, 0.88),
+  ];
+  FlameDirections.forEach((Direction, Index) => Geometries.push(
+    createPlacedLandmarkGeometry(
+      FlameSource, Direction, WorldDefinition.radius - 0.05, 0.8 + ((Index % 2) * 0.15), Index * 0.7,
+    ),
+  ));
+  const HaloGeometry = HaloSource.index ? HaloSource.toNonIndexed() : HaloSource.clone();
+  HaloGeometry.rotateX(0.82);
+  addRestorationGeometryAttributes(HaloGeometry, null, 1);
+  Geometries.push(HaloGeometry);
+  FlameSource.dispose();
+  HaloSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Joins sheltering roots and bell arches into a world made from shared memories. */
+function createMemorySurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const ArchSource = new THREE.TorusGeometry(0.7, 0.1, 5, 20, Math.PI);
+  const LeafSource = new THREE.IcosahedronGeometry(0.28, 1);
+  LeafSource.scale(0.72, 1.45, 0.8);
+  LeafSource.translate(0, 0.64, 0);
+  [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5].forEach((Yaw, Index) => {
+    Geometries.push(createFrontLandmarkGeometry(
+      ArchSource, WorldDefinition.radius + 0.08, 0, -0.12, 0.9, Index % 2 ? 0.1 : -0.1, Yaw,
+    ));
+    Geometries.push(createFrontLandmarkGeometry(
+      LeafSource, WorldDefinition.radius + 0.06, 0, 0.18, 0.78, Index * 0.45, Yaw,
+    ));
+  });
+  ArchSource.dispose();
+  LeafSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Wraps the finale's strongest gravity well in routes and radial star fins. */
+function createStarwellSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const RingSource = new THREE.TorusGeometry(WorldDefinition.radius * 1.055, 0.075, 5, 46);
+  [
+    { x: 0.2, y: 0.35 }, { x: 1.08, y: -0.28 }, { x: -0.84, y: 0.72 },
+  ].forEach((Rotation) => {
+    const RingGeometry = RingSource.index ? RingSource.toNonIndexed() : RingSource.clone();
+    RingGeometry.rotateX(Rotation.x);
+    RingGeometry.rotateY(Rotation.y);
+    addRestorationGeometryAttributes(RingGeometry, null, 1);
+    Geometries.push(RingGeometry);
+  });
+  const RaySource = new THREE.ConeGeometry(0.2, 1.45, 5);
+  RaySource.translate(0, 0.725, 0);
+  [
+    new THREE.Vector3(-0.55, 0.42, 0.76), new THREE.Vector3(0, 0.68, 0.74),
+    new THREE.Vector3(0.55, 0.42, 0.76), new THREE.Vector3(0.45, -0.38, 0.82),
+    new THREE.Vector3(-0.45, -0.38, 0.82),
+  ].forEach((Direction, Index) => Geometries.push(createPlacedLandmarkGeometry(
+    RaySource, Direction, WorldDefinition.radius - 0.08, 0.82 + ((Index % 2) * 0.12), Index * 0.8,
+  )));
+  RingSource.dispose();
+  RaySource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Opens flower petals into long dawn rays around the finale's far world. */
+function createDawnSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const PetalSource = new THREE.IcosahedronGeometry(0.4, 1);
+  PetalSource.scale(0.58, 1.5, 0.76);
+  PetalSource.translate(0, 0.58, 0);
+  const Directions = [
+    new THREE.Vector3(-0.6, 0.28, 0.78), new THREE.Vector3(-0.2, 0.64, 0.76),
+    new THREE.Vector3(0.32, 0.56, 0.78), new THREE.Vector3(0.62, 0.08, 0.8),
+    new THREE.Vector3(0.34, -0.44, 0.84), new THREE.Vector3(-0.28, -0.48, 0.84),
+  ];
+  Directions.forEach((Direction, Index) => Geometries.push(createPlacedLandmarkGeometry(
+    PetalSource, Direction, WorldDefinition.radius - 0.06, 0.82 + ((Index % 2) * 0.16), Index * 0.74,
+  )));
+  PetalSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Suspends three memory prisms inside a single resonant halo. */
+function createChorusSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const PrismSource = new THREE.OctahedronGeometry(0.48, 0);
+  PrismSource.scale(0.68, 1.45, 0.68);
+  PrismSource.translate(0, 0.62, 0);
+  const HaloSource = new THREE.TorusGeometry(0.76, 0.08, 5, 24);
+  [
+    new THREE.Vector3(-0.4, 0.32, 0.88),
+    new THREE.Vector3(0.38, 0.36, 0.88),
+    new THREE.Vector3(0, -0.42, 0.92),
+  ].forEach((Direction, Index) => Geometries.push(createPlacedLandmarkGeometry(
+    PrismSource, Direction, WorldDefinition.radius - 0.04, 0.82 + (Index * 0.08), Index * 0.82,
+  )));
+  Geometries.push(createFrontLandmarkGeometry(
+    HaloSource, WorldDefinition.radius + 0.15, 0, 0, 0.95, -0.16,
+  ));
+  PrismSource.dispose();
+  HaloSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
 /** Selects one-call authored geometry for lightweight route worlds. */
 function createMergedSurfaceGeometry(WorldDefinition) {
   const MergedGeometryFactories = {
@@ -1349,6 +1483,12 @@ function createMergedSurfaceGeometry(WorldDefinition) {
     beacon: createBeaconSurfaceGeometry,
     umbra: createUmbraSurfaceGeometry,
     lumen: createLumenSurfaceGeometry,
+    confluence: createConfluenceSurfaceGeometry,
+    kindle: createKindleSurfaceGeometry,
+    memory: createMemorySurfaceGeometry,
+    starwell: createStarwellSurfaceGeometry,
+    dawn: createDawnSurfaceGeometry,
+    chorus: createChorusSurfaceGeometry,
   };
   return (
     MergedGeometryFactories[WorldDefinition.visualKey]
@@ -2166,6 +2306,86 @@ TacticalBodyMesh.setColorAt(1, new THREE.Color(0xc88761));
 TacticalBodyMesh.setColorAt(2, new THREE.Color(0xffd678));
 TacticalBodyMesh.instanceColor.needsUpdate = true;
 Scene.add(TacticalBodyMesh);
+
+/**
+ * The campaign finale stays within four pooled draw calls: one heart, one route network,
+ * one instanced pulse and one instanced spark field. It is dormant in every other chapter.
+ */
+const FinaleCoreGeometry = new THREE.IcosahedronGeometry(WorldheartDefinition.radius, 3);
+const FinaleCoreMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffe0a0,
+  emissive: 0xffc968,
+  emissiveIntensity: 2.4,
+  roughness: 0.28,
+  metalness: 0.08,
+});
+const FinaleCoreMesh = new THREE.Mesh(FinaleCoreGeometry, FinaleCoreMaterial);
+FinaleCoreMesh.position.set(
+  WorldheartDefinition.position.x,
+  WorldheartDefinition.position.y,
+  0.1,
+);
+FinaleCoreMesh.visible = false;
+Scene.add(FinaleCoreMesh);
+
+const FinaleLinkPositionValues = new Float32Array(WorldDefinitions.length * 6);
+const FinaleLinkGeometry = new THREE.BufferGeometry();
+const FinaleLinkPositionAttribute = new THREE.BufferAttribute(FinaleLinkPositionValues, 3);
+FinaleLinkPositionAttribute.setUsage(THREE.DynamicDrawUsage);
+FinaleLinkGeometry.setAttribute('position', FinaleLinkPositionAttribute);
+const FinaleLinkMaterial = new THREE.LineBasicMaterial({
+  color: ActiveSystem.finale?.pulseColor ?? 0xffe0a0,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const FinaleLinkMesh = new THREE.LineSegments(FinaleLinkGeometry, FinaleLinkMaterial);
+FinaleLinkMesh.visible = false;
+FinaleLinkMesh.frustumCulled = false;
+Scene.add(FinaleLinkMesh);
+
+const FinalePulseCount = 5;
+const FinalePulseGeometry = new THREE.RingGeometry(0.82, 0.92, 64);
+const FinalePulseMaterial = new THREE.MeshBasicMaterial({
+  color: ActiveSystem.finale?.pulseColor ?? 0xffe0a0,
+  transparent: true,
+  opacity: 0,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const FinalePulseMesh = new THREE.InstancedMesh(
+  FinalePulseGeometry,
+  FinalePulseMaterial,
+  FinalePulseCount,
+);
+const FinalePulseTransform = new THREE.Object3D();
+FinalePulseMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+FinalePulseMesh.frustumCulled = false;
+FinalePulseMesh.visible = false;
+Scene.add(FinalePulseMesh);
+
+const FinaleSparkCount = 56;
+const FinaleSparkGeometry = new THREE.OctahedronGeometry(0.09, 0);
+const FinaleSparkMaterial = new THREE.MeshBasicMaterial({
+  color: ActiveSystem.finale?.pulseColor ?? 0xffe0a0,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  toneMapped: false,
+});
+const FinaleSparkMesh = new THREE.InstancedMesh(
+  FinaleSparkGeometry,
+  FinaleSparkMaterial,
+  FinaleSparkCount,
+);
+const FinaleSparkTransform = new THREE.Object3D();
+FinaleSparkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+FinaleSparkMesh.frustumCulled = false;
+FinaleSparkMesh.visible = false;
+Scene.add(FinaleSparkMesh);
 
 /** Builds a restrained orbit guide so deterministic moving bodies remain readable. */
 function createOrbitGuidePoints(BodyDefinition, Height) {
@@ -3199,14 +3419,143 @@ function attachSeedToWorldheart(ImpactPosition) {
   updateWorldheartObjective();
   updateVictorySummary();
   hideInstruction();
-  showStatusToast(`${WorldheartDefinition.label} RECONNECTED`, 1100);
+  if (IsCampaignFinale) {
+    beginFinaleRestoration();
+    showStatusToast('THE WORLDHEART IS AWAKENING', 2200, 'memory');
+  } else {
+    showStatusToast(`${WorldheartDefinition.label} RECONNECTED`, 1100);
+  }
 
   WorldheartCompletionTimeoutIdentifier = window.setTimeout(() => {
     VictoryPanelElement.hidden = false;
     GamePhase = 'victory';
     WorldseedSound.victory();
     WorldheartCompletionTimeoutIdentifier = null;
-  }, 850);
+  }, (ActiveSystem.finale?.victoryDelaySeconds ?? 0.85) * 1000);
+}
+
+/** Starts the final system-scale pulse only after the seed physically lands in the core. */
+function beginFinaleRestoration() {
+  FinaleRestorationStartedAtSeconds = GameElapsedTimeSeconds;
+  FinaleCoreMesh.visible = true;
+  FinaleLinkMesh.visible = true;
+  FinalePulseMesh.visible = true;
+  FinaleSparkMesh.visible = true;
+  FinaleLinkMaterial.opacity = 0;
+  FinalePulseMaterial.opacity = 0;
+  FinaleSparkMaterial.opacity = 0;
+  GameCanvas.dataset.finaleRestoration = 'active';
+}
+
+/**
+ * Sends the living pulse back through every restored route before revealing the final summary.
+ * This is presentation-only; physics and campaign state are already settled at impact.
+ */
+function updateFinaleRestorationVisuals(ElapsedTimeSeconds) {
+  if (FinaleRestorationStartedAtSeconds === null) {
+    return;
+  }
+
+  const FinaleDurationSeconds = ActiveSystem.finale.victoryDelaySeconds;
+  const FinaleElapsedSeconds = Math.min(
+    FinaleDurationSeconds,
+    Math.max(0, ElapsedTimeSeconds - FinaleRestorationStartedAtSeconds),
+  );
+  const FinaleProgress = THREE.MathUtils.smoothstep(
+    FinaleElapsedSeconds / FinaleDurationSeconds,
+    0,
+    1,
+  );
+  const PulseArrivalProgress = THREE.MathUtils.smoothstep(FinaleElapsedSeconds, 0.18, 2.25);
+
+  FinaleCoreMesh.rotation.x = FinaleElapsedSeconds * 0.38;
+  FinaleCoreMesh.rotation.y = FinaleElapsedSeconds * 0.62;
+  FinaleCoreMesh.scale.setScalar(
+    1 + (Math.sin(FinaleElapsedSeconds * 4.2) * 0.08) + (FinaleProgress * 0.18),
+  );
+  FinaleCoreMaterial.emissiveIntensity = 2.4 + (PulseArrivalProgress * 2.2);
+
+  let LinkValueOffset = 0;
+  WorldDefinitions.forEach((WorldDefinition, WorldIndex) => {
+    const WorldPulseProgress = WorldDefinition.restored
+      ? THREE.MathUtils.smoothstep(
+        FinaleElapsedSeconds,
+        0.2 + (WorldIndex * 0.12),
+        1.35 + (WorldIndex * 0.12),
+      )
+      : 0;
+    FinaleLinkPositionValues[LinkValueOffset] = WorldheartDefinition.position.x;
+    FinaleLinkPositionValues[LinkValueOffset + 1] = WorldheartDefinition.position.y;
+    FinaleLinkPositionValues[LinkValueOffset + 2] = 0.04;
+    FinaleLinkPositionValues[LinkValueOffset + 3] = THREE.MathUtils.lerp(
+      WorldheartDefinition.position.x,
+      WorldDefinition.position.x,
+      WorldPulseProgress,
+    );
+    FinaleLinkPositionValues[LinkValueOffset + 4] = THREE.MathUtils.lerp(
+      WorldheartDefinition.position.y,
+      WorldDefinition.position.y,
+      WorldPulseProgress,
+    );
+    FinaleLinkPositionValues[LinkValueOffset + 5] = 0.04;
+    LinkValueOffset += 6;
+  });
+  FinaleLinkPositionAttribute.needsUpdate = true;
+  FinaleLinkMaterial.opacity = 0.12 + (PulseArrivalProgress * 0.54);
+
+  for (let PulseIndex = 0; PulseIndex < FinalePulseCount; PulseIndex += 1) {
+    const PulseElapsedSeconds = FinaleElapsedSeconds - (PulseIndex * 0.34);
+    const IsPulseActive = PulseElapsedSeconds >= 0;
+    const PulseScale = IsPulseActive
+      ? WorldheartDefinition.radius * (1.2 + (PulseElapsedSeconds * 2.8))
+      : 0.001;
+    FinalePulseTransform.position.set(
+      WorldheartDefinition.position.x,
+      WorldheartDefinition.position.y,
+      0.02 + (PulseIndex * 0.004),
+    );
+    FinalePulseTransform.rotation.set(0, 0, PulseIndex * 0.3);
+    FinalePulseTransform.scale.setScalar(PulseScale);
+    FinalePulseTransform.updateMatrix();
+    FinalePulseMesh.setMatrixAt(PulseIndex, FinalePulseTransform.matrix);
+  }
+  FinalePulseMesh.instanceMatrix.needsUpdate = true;
+  FinalePulseMaterial.opacity = 0.46 * (1 - (FinaleProgress * 0.45));
+
+  for (let SparkIndex = 0; SparkIndex < FinaleSparkCount; SparkIndex += 1) {
+    const SparkFraction = SparkIndex / FinaleSparkCount;
+    const SparkAngle = (SparkIndex * 2.399963) + (FinaleElapsedSeconds * 0.18);
+    const SparkRadius = WorldheartDefinition.radius
+      + (PulseArrivalProgress * (1.4 + (SparkFraction * 8.6)));
+    FinaleSparkTransform.position.set(
+      WorldheartDefinition.position.x + (Math.cos(SparkAngle) * SparkRadius),
+      WorldheartDefinition.position.y + (Math.sin(SparkAngle) * SparkRadius),
+      -0.3 + ((SparkIndex % 9) * 0.08),
+    );
+    FinaleSparkTransform.rotation.set(
+      SparkAngle * 0.5,
+      SparkAngle * 0.32,
+      SparkAngle,
+    );
+    FinaleSparkTransform.scale.setScalar(
+      (0.42 + ((SparkIndex % 5) * 0.09)) * PulseArrivalProgress,
+    );
+    FinaleSparkTransform.updateMatrix();
+    FinaleSparkMesh.setMatrixAt(SparkIndex, FinaleSparkTransform.matrix);
+  }
+  FinaleSparkMesh.instanceMatrix.needsUpdate = true;
+  FinaleSparkMaterial.opacity = 0.28 + (PulseArrivalProgress * 0.62);
+
+  Scene.background.copy(InitialSceneBackgroundColor).lerp(
+    ActiveSystem.finale.awakenedBackgroundColor,
+    FinaleProgress,
+  );
+  Renderer.toneMappingExposure = ActiveSystem.environment.toneMappingExposure
+    + (Math.sin(FinaleProgress * Math.PI) * 0.22)
+    + (FinaleProgress * 0.08);
+  if (FinaleProgress >= 1) {
+    GameCanvas.dataset.finaleRestoration = 'complete';
+  }
 }
 
 /**
@@ -3541,6 +3890,9 @@ function handlePointerUp(PointerEventData) {
     AimLaunchVelocity.y,
     0,
   );
+  GameCanvas.dataset.lastLaunchVelocityX = AimLaunchVelocity.x.toFixed(3);
+  GameCanvas.dataset.lastLaunchVelocityY = AimLaunchVelocity.y.toFixed(3);
+  GameCanvas.dataset.lastLaunchTime = PhysicsElapsedTimeSeconds.toFixed(3);
   const IsLaunchingFromSeedstone = CurrentWorldIdentifier === SeedstoneDefinition.id;
   FlightOriginWorldIdentifier = IsLaunchingFromSeedstone ? null : CurrentWorldIdentifier;
   FlightCollectedStardustIdentifiers.clear();
@@ -4095,6 +4447,7 @@ function updatePerformanceBudget(DeltaTimeSeconds) {
   GameCanvas.dataset.maxDrawCalls = String(MaximumObservedDrawCalls);
   GameCanvas.dataset.triangles = String(Renderer.info.render.triangles);
   GameCanvas.dataset.frameRate = String(Math.round(1 / Math.max(AverageFrameSeconds, 0.001)));
+  GameCanvas.dataset.physicsTime = PhysicsElapsedTimeSeconds.toFixed(3);
   GameCanvas.dataset.withinDrawCallBudget = String(
     MaximumObservedDrawCalls <= MaximumDrawCallBudget,
   );
@@ -4157,6 +4510,9 @@ function resetGame() {
   resetFlightFeedback();
   GameCanvas.dataset.lastFlightAccolade = '';
   GameCanvas.dataset.lastMemory = '';
+  GameCanvas.dataset.lastLaunchVelocityX = '';
+  GameCanvas.dataset.lastLaunchVelocityY = '';
+  GameCanvas.dataset.lastLaunchTime = '';
 
   for (const WorldDefinition of WorldDefinitions) {
     const IsInitiallyRestored = WorldDefinition.initiallyRestored === true;
@@ -4240,6 +4596,18 @@ function resetGame() {
   WorldheartDefinition.routeAvailable = WorldheartDefinition.routeAvailableInitially === true;
   WorldheartDefinition.restored = WorldheartDefinition.initiallyRestored === true;
   WorldheartJustUnlocked = false;
+  FinaleRestorationStartedAtSeconds = null;
+  FinaleCoreMesh.visible = false;
+  FinaleCoreMesh.scale.setScalar(1);
+  FinaleLinkMesh.visible = false;
+  FinalePulseMesh.visible = false;
+  FinaleSparkMesh.visible = false;
+  FinaleLinkMaterial.opacity = 0;
+  FinalePulseMaterial.opacity = 0;
+  FinaleSparkMaterial.opacity = 0;
+  Scene.background.copy(InitialSceneBackgroundColor);
+  Renderer.toneMappingExposure = ActiveSystem.environment.toneMappingExposure;
+  GameCanvas.dataset.finaleRestoration = '';
   for (const StardustDefinition of StardustDefinitions) {
     StardustDefinition.collected = false;
   }
@@ -4317,6 +4685,7 @@ function renderFrame() {
 
   updateWorldRestorationVisuals(ElapsedTimeSeconds);
   updateWorldBiomeMotion(DeltaTimeSeconds, ElapsedTimeSeconds);
+  updateFinaleRestorationVisuals(ElapsedTimeSeconds);
   updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds);
   updateCamera(DeltaTimeSeconds);
   updateTacticalBodies(ElapsedTimeSeconds);

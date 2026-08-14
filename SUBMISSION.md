@@ -29,7 +29,7 @@ WORLDSEED is a focused Three.js orbital slingshot game about carrying life throu
 Drag the glowing seed backwards and release it into the gravity wells of a connected miniature system. The trajectory preview uses the same deterministic fixed-step simulation as live flight—including the future position of moving hazards—so every curved shot is yours. Land successfully and a luminous restoration wave wraps around the planet from the exact impact point, growing its diorama, atmosphere, motion and music in sequence.
 
 - **One expressive input:** drag and release with mouse, pen or touch.
-- **A four-chapter journey:** First Light teaches the seed's purpose; Broken Belt introduces fractured route choices; Wandering Garden adds an orbiting Pollen Moon launch window; Long Night demands longer gravity commitments on the road to the Worldheart.
+- **A five-chapter journey:** First Light teaches the seed's purpose; Broken Belt introduces fractured routes; Wandering Garden adds a moving launch window; Long Night demands longer gravity commitments; and Worldheart recombines every decision before the campaign's largest restoration.
 - **A trustworthy gravity toy:** prediction and live flight share one deterministic simulation.
 - **Readable tactical routes:** one-use Seedstones and a moving moon create new launch geometry, while orbiting asteroids turn future collisions red before release.
 - **Optional mastery:** each system's three-mote Arc rewards an expressive route; predicted pickups glow before release and bank only after a successful landing.
@@ -37,6 +37,7 @@ Drag the glowing seed backwards and release it into the gravity wells of a conne
 - **Story through play:** every awakening reveals one short memory, while close passes and gravity assists celebrate expressive routes without interrupting the next choice.
 - **Immediate recovery:** failed shots return the seed quickly, preserving experimentation.
 - **An authored transformation:** every landing awakens colour, landmarks, ambience and another layer of the procedural score.
+- **A true finale:** the physical Worldheart landing lights every restored route, sends a pulse across the whole system and resolves the last seed's journey before the final constellation appears.
 - **Desktop and mobile ready:** responsive framing, touch controls, adaptive pixel density and a mute control.
 
 No downloaded art or audio assets are used. The dioramas, particles, shaders, music and sound effects are generated in code; Three.js is the sole runtime dependency.
