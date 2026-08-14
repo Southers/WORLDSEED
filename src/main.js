@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7m';
+import { WorldseedAudio } from './audio.js?v=20260814-7n';
 
 import {
   DefaultAuthoredSystemIdentifier,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
   getNextAuthoredSystemIdentifier,
-} from './content.js?v=20260814-7m';
+} from './content.js?v=20260814-7n';
 
 import {
   countRestoredWorlds,
@@ -18,7 +18,7 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260814-7m';
+} from './campaign.js?v=20260814-7n';
 
 import {
   calculateBodyPositionAtTime,
@@ -28,12 +28,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7m';
+} from './physics.js?v=20260814-7n';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7m';
+} from './restoration.js?v=20260814-7n';
 
 const RequestedSystemIdentifier = new URLSearchParams(window.location.search).get('system')
   ?? DefaultAuthoredSystemIdentifier;
@@ -101,7 +101,7 @@ const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
 configureSystemInterface();
-GameCanvas.dataset.build = '20260814-7m';
+GameCanvas.dataset.build = '20260814-7n';
 GameCanvas.dataset.system = ActiveSystem.id;
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
@@ -153,6 +153,7 @@ const CameraLookTarget = new THREE.Vector3();
 const DesiredCameraLookTarget = new THREE.Vector3();
 const AimDragVector = new THREE.Vector3();
 const AimLaunchVelocity = new THREE.Vector3();
+const LastAimPointerWorldPosition = new THREE.Vector3();
 const LocalSwayAxis = new THREE.Vector3(0, 0, 1);
 const SurfaceSwayQuaternion = new THREE.Quaternion();
 const RouteLabelProjection = new THREE.Vector3();
@@ -184,6 +185,7 @@ let ImpactPulseLifeSeconds = 0;
 let CameraImpactLifeSeconds = 0;
 let SeedstoneUsesRemaining = SeedstoneDefinition.uses;
 let SeedstoneCrumbleStartedAtSeconds = null;
+let AttachedSeedstoneSurfaceOffset = null;
 let WorldheartJustUnlocked = false;
 let PredictedStardustIdentifiers = new Set();
 let FlightOriginWorldIdentifier = null;
@@ -1007,6 +1009,150 @@ function createTideSurfaceGeometry(WorldDefinition) {
   return mergeRestorationGeometries(Geometries);
 }
 
+/** Builds Bower's sheltering vine arches into one restorable silhouette. */
+function createBowerSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const ArchSource = new THREE.TorusGeometry(0.92, 0.13, 5, 20, Math.PI);
+  [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5].forEach((ArchYaw, ArchIndex) => {
+    Geometries.push(createFrontLandmarkGeometry(
+      ArchSource,
+      WorldDefinition.radius + 0.08,
+      0,
+      -0.18,
+      0.92 + ((ArchIndex % 2) * 0.12),
+      ArchIndex % 2 === 0 ? -0.12 : 0.12,
+      ArchYaw,
+    ));
+  });
+  ArchSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Lantern's upward flower lamps into its existing surface call. */
+function createLanternSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const LampSource = new THREE.ConeGeometry(0.4, 1.25, 7, 1, true);
+  LampSource.translate(0, 0.625, 0);
+  const LampDirections = [
+    new THREE.Vector3(-0.52, 0.26, 0.84),
+    new THREE.Vector3(-0.12, 0.58, 0.82),
+    new THREE.Vector3(0.34, 0.48, 0.84),
+    new THREE.Vector3(0.6, 0.04, 0.82),
+    new THREE.Vector3(0.08, -0.48, 0.9),
+  ];
+  LampDirections.forEach((LampDirection, LampIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      LampSource,
+      LampDirection,
+      WorldDefinition.radius - 0.06,
+      0.78 + ((LampIndex % 3) * 0.13),
+      LampIndex * 0.72,
+    ));
+  });
+  LampSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Canopy's clustered treetops as a single low-cost world mesh. */
+function createCanopySurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const TrunkSource = new THREE.CylinderGeometry(0.08, 0.15, 0.72, 6);
+  TrunkSource.translate(0, 0.36, 0);
+  const CrownSource = new THREE.IcosahedronGeometry(0.42, 1);
+  CrownSource.translate(0, 0.86, 0);
+  const TreeDirections = [
+    new THREE.Vector3(-0.52, 0.24, 0.84),
+    new THREE.Vector3(-0.08, 0.62, 0.8),
+    new THREE.Vector3(0.44, 0.38, 0.84),
+    new THREE.Vector3(0.28, -0.38, 0.9),
+    new THREE.Vector3(-0.36, -0.34, 0.88),
+  ];
+  TreeDirections.forEach((TreeDirection, TreeIndex) => {
+    const TreeScale = 0.82 + ((TreeIndex % 3) * 0.13);
+    Geometries.push(createPlacedLandmarkGeometry(
+      TrunkSource, TreeDirection, WorldDefinition.radius, TreeScale, TreeIndex * 0.6,
+    ));
+    Geometries.push(createPlacedLandmarkGeometry(
+      CrownSource, TreeDirection, WorldDefinition.radius, TreeScale, TreeIndex * 0.6,
+    ));
+  });
+  TrunkSource.dispose();
+  CrownSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Crown's ring of oversized petals around a dark central bloom. */
+function createCrownSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const PetalSource = new THREE.IcosahedronGeometry(0.48, 1);
+  PetalSource.scale(0.62, 1.45, 0.8);
+  PetalSource.translate(0, 0.62, 0);
+  const PetalDirections = [
+    new THREE.Vector3(-0.58, 0.3, 0.8),
+    new THREE.Vector3(-0.18, 0.64, 0.78),
+    new THREE.Vector3(0.28, 0.58, 0.8),
+    new THREE.Vector3(0.62, 0.16, 0.8),
+    new THREE.Vector3(0.42, -0.38, 0.84),
+    new THREE.Vector3(-0.12, -0.52, 0.88),
+    new THREE.Vector3(-0.54, -0.22, 0.84),
+  ];
+  PetalDirections.forEach((PetalDirection, PetalIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      PetalSource,
+      PetalDirection,
+      WorldDefinition.radius - 0.08,
+      0.8 + ((PetalIndex % 2) * 0.12),
+      PetalIndex * 0.84,
+    ));
+  });
+  PetalSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Dew's crystalline droplets into a clean, cool silhouette. */
+function createDewSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const DropSource = new THREE.ConeGeometry(0.3, 1.05, 7);
+  DropSource.translate(0, 0.525, 0);
+  const DropDirections = [
+    new THREE.Vector3(-0.5, 0.4, 0.82),
+    new THREE.Vector3(0, 0.68, 0.76),
+    new THREE.Vector3(0.48, 0.38, 0.82),
+    new THREE.Vector3(0.5, -0.28, 0.84),
+    new THREE.Vector3(-0.12, -0.5, 0.88),
+  ];
+  DropDirections.forEach((DropDirection, DropIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      DropSource,
+      DropDirection,
+      WorldDefinition.radius - 0.04,
+      0.72 + ((DropIndex % 3) * 0.16),
+      DropIndex * 0.66,
+    ));
+  });
+  DropSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Nest's woven protective ribs around its small resting place. */
+function createNestSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const RibSource = new THREE.TorusGeometry(0.78, 0.09, 5, 22, Math.PI * 1.25);
+  [0, 0.74, 1.48, 2.22].forEach((RibRotation, RibIndex) => {
+    Geometries.push(createFrontLandmarkGeometry(
+      RibSource,
+      WorldDefinition.radius + 0.1,
+      0,
+      -0.12,
+      0.9 + ((RibIndex % 2) * 0.1),
+      RibRotation * 0.16,
+      RibRotation,
+    ));
+  });
+  RibSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
 /** Selects one-call authored geometry for lightweight route worlds. */
 function createMergedSurfaceGeometry(WorldDefinition) {
   const MergedGeometryFactories = {
@@ -1018,6 +1164,12 @@ function createMergedSurfaceGeometry(WorldDefinition) {
     shard: createShardSurfaceGeometry,
     drift: createTideSurfaceGeometry,
     vault: createVaultSurfaceGeometry,
+    bower: createBowerSurfaceGeometry,
+    lantern: createLanternSurfaceGeometry,
+    canopy: createCanopySurfaceGeometry,
+    crown: createCrownSurfaceGeometry,
+    dew: createDewSurfaceGeometry,
+    nest: createNestSurfaceGeometry,
   };
   return (
     MergedGeometryFactories[WorldDefinition.visualKey]
@@ -1836,16 +1988,24 @@ TacticalBodyMesh.setColorAt(2, new THREE.Color(0xffd678));
 TacticalBodyMesh.instanceColor.needsUpdate = true;
 Scene.add(TacticalBodyMesh);
 
-/** A restrained orbit guide makes the moving hazard's future path readable. */
-const AsteroidOrbitPoints = [];
-for (let OrbitPointIndex = 0; OrbitPointIndex < 96; OrbitPointIndex += 1) {
-  const OrbitAngle = (OrbitPointIndex / 96) * Math.PI * 2;
-  AsteroidOrbitPoints.push(new THREE.Vector3(
-    AsteroidDefinition.orbit.centre.x + (Math.cos(OrbitAngle) * AsteroidDefinition.orbit.radius),
-    AsteroidDefinition.orbit.centre.y + (Math.sin(OrbitAngle) * AsteroidDefinition.orbit.radius),
-    0.04,
-  ));
+/** Builds a restrained orbit guide so deterministic moving bodies remain readable. */
+function createOrbitGuidePoints(BodyDefinition, Height) {
+  if (!BodyDefinition.orbit) {
+    return [];
+  }
+  const OrbitPoints = [];
+  for (let OrbitPointIndex = 0; OrbitPointIndex < 96; OrbitPointIndex += 1) {
+    const OrbitAngle = (OrbitPointIndex / 96) * Math.PI * 2;
+    OrbitPoints.push(new THREE.Vector3(
+      BodyDefinition.orbit.centre.x + (Math.cos(OrbitAngle) * BodyDefinition.orbit.radius),
+      BodyDefinition.orbit.centre.y + (Math.sin(OrbitAngle) * BodyDefinition.orbit.radius),
+      Height,
+    ));
+  }
+  return OrbitPoints;
 }
+
+const AsteroidOrbitPoints = createOrbitGuidePoints(AsteroidDefinition, 0.04);
 const AsteroidOrbitGeometry = new THREE.BufferGeometry().setFromPoints(AsteroidOrbitPoints);
 const AsteroidOrbitMaterial = new THREE.LineBasicMaterial({
   color: 0xb96c5c,
@@ -1855,6 +2015,19 @@ const AsteroidOrbitMaterial = new THREE.LineBasicMaterial({
 });
 const AsteroidOrbitLine = new THREE.LineLoop(AsteroidOrbitGeometry, AsteroidOrbitMaterial);
 Scene.add(AsteroidOrbitLine);
+
+const SeedstoneOrbitGeometry = new THREE.BufferGeometry().setFromPoints(
+  createOrbitGuidePoints(SeedstoneDefinition, 0.045),
+);
+const SeedstoneOrbitMaterial = new THREE.LineBasicMaterial({
+  color: 0x72d9ff,
+  transparent: true,
+  opacity: 0.13,
+  depthWrite: false,
+});
+const SeedstoneOrbitLine = new THREE.LineLoop(SeedstoneOrbitGeometry, SeedstoneOrbitMaterial);
+SeedstoneOrbitLine.visible = Boolean(SeedstoneDefinition.orbit);
+Scene.add(SeedstoneOrbitLine);
 
 /** Three optional motes trace one expressive Meadow-to-Frost mastery arc. */
 const StardustGeometry = new THREE.OctahedronGeometry(StardustPickupRadius, 0);
@@ -2099,6 +2272,30 @@ function publishAttachedSeedState(NodeIdentifier, Position) {
   GameCanvas.dataset.seedWorldY = Position.y.toFixed(3);
 }
 
+/** Synchronises an authored moving launch node and any seed currently riding its surface. */
+function synchronizeSeedstonePosition() {
+  const SeedstonePosition = calculateBodyPositionAtTime(
+    SeedstoneDefinition,
+    PhysicsElapsedTimeSeconds,
+  );
+  SeedstoneDefinition.position.x = SeedstonePosition.x;
+  SeedstoneDefinition.position.y = SeedstonePosition.y;
+  SeedstoneDefinition.position.z = SeedstonePosition.z;
+
+  if (
+    CurrentWorldIdentifier === SeedstoneDefinition.id
+    && GamePhase === 'attached'
+    && AttachedSeedstoneSurfaceOffset
+  ) {
+    SeedPhysicsState.position.x = SeedstonePosition.x + AttachedSeedstoneSurfaceOffset.x;
+    SeedPhysicsState.position.y = SeedstonePosition.y + AttachedSeedstoneSurfaceOffset.y;
+    SeedPhysicsState.position.z = SeedstonePosition.z + AttachedSeedstoneSurfaceOffset.z;
+    publishAttachedSeedState(CurrentWorldIdentifier, SeedPhysicsState.position);
+  }
+
+  return SeedstoneDefinition.position;
+}
+
 /** Returns the collision bodies that are active at the current campaign state. */
 function getActiveTacticalBodyDefinitions() {
   return TacticalBodyDefinitions.filter((BodyDefinition) => (
@@ -2225,6 +2422,7 @@ function updateTacticalBodies(ElapsedTimeSeconds) {
     AsteroidDefinition,
     PhysicsElapsedTimeSeconds,
   );
+  const SeedstonePosition = synchronizeSeedstonePosition();
   const SeedstoneScale = SeedstoneUsesRemaining > 0
     ? 1 + (Math.sin(ElapsedTimeSeconds * 4.4) * 0.045)
     : Math.max(
@@ -2233,8 +2431,8 @@ function updateTacticalBodies(ElapsedTimeSeconds) {
     );
 
   TacticalBodyTransform.position.set(
-    SeedstoneDefinition.position.x,
-    SeedstoneDefinition.position.y,
+    SeedstonePosition.x,
+    SeedstonePosition.y,
     0.08,
   );
   TacticalBodyTransform.rotation.set(
@@ -2283,13 +2481,19 @@ function updateTacticalBodies(ElapsedTimeSeconds) {
   TacticalBodyMesh.visible = ShouldShowTacticalLayer;
   AsteroidOrbitLine.visible = ShouldShowTacticalLayer;
   AsteroidOrbitMaterial.opacity = 0.14 + (Math.sin(ElapsedTimeSeconds * 1.8) * 0.035);
+  SeedstoneOrbitLine.visible = ShouldShowTacticalLayer && Boolean(SeedstoneDefinition.orbit);
+  SeedstoneOrbitMaterial.opacity = 0.11 + (Math.sin(ElapsedTimeSeconds * 1.5) * 0.025);
 
   const TacticalLabelDefinitions = [
     SeedstoneUsesRemaining > 0
       ? {
         definition: SeedstoneDefinition,
-        position: SeedstoneDefinition.position,
-        text: `${SeedstoneDefinition.label} · 1 USE`,
+        position: SeedstonePosition,
+        text: SeedstoneDefinition.orbit
+          ? window.innerWidth <= 520
+            ? `${SeedstoneDefinition.label} · 1 USE`
+            : `${SeedstoneDefinition.label} · MOVING · 1 USE`
+          : `${SeedstoneDefinition.label} · 1 USE`,
       }
       : null,
     {
@@ -2723,10 +2927,18 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
   }
 }
 
-/** Lands on the one-use Seedstone without counting it as an awakened world. */
-function attachSeedToSeedstone(ImpactPosition) {
+/** Lands on the one-use launch node without counting it as an awakened world. */
+function attachSeedToSeedstone(ImpactPosition, BodyPosition) {
+  SeedstoneDefinition.position.x = BodyPosition.x;
+  SeedstoneDefinition.position.y = BodyPosition.y;
+  SeedstoneDefinition.position.z = BodyPosition.z;
   const LandingAccolade = getCurrentLandingAccolade(SeedstoneDefinition.id, true);
   const SurfaceRestPosition = calculateSurfaceRestPosition(SeedstoneDefinition, ImpactPosition);
+  AttachedSeedstoneSurfaceOffset = createVector(
+    SurfaceRestPosition.x - BodyPosition.x,
+    SurfaceRestPosition.y - BodyPosition.y,
+    SurfaceRestPosition.z - BodyPosition.z,
+  );
 
   ImpactPulseMesh.material.color.set(0x72d9ff);
   ImpactPulseMesh.position.set(ImpactPosition.x, ImpactPosition.y, 0.22);
@@ -2755,8 +2967,10 @@ function attachSeedToSeedstone(ImpactPosition) {
     1100,
   );
   showInstruction(
-    'Temporary launchpad',
-    'Choose the next world carefully — the Seedstone crumbles after launch.',
+    SeedstoneDefinition.orbit ? 'Moving launch window' : 'Temporary launchpad',
+    SeedstoneDefinition.orbit
+      ? `Ride ${SeedstoneDefinition.label} into position, then launch before it crumbles.`
+      : `Choose the next world carefully — ${SeedstoneDefinition.label} crumbles after launch.`,
   );
 }
 
@@ -3065,6 +3279,7 @@ function handlePointerDown(PointerEventData) {
   }
 
   IsPointerAiming = true;
+  LastAimPointerWorldPosition.copy(CurrentPointerWorldPosition);
   WorldseedSound.beginAim();
   ActivePointerIdentifier = PointerEventData.pointerId;
   GameCanvas.setPointerCapture(PointerEventData.pointerId);
@@ -3090,6 +3305,7 @@ function handlePointerMove(PointerEventData) {
     return;
   }
 
+  LastAimPointerWorldPosition.copy(CurrentPointerWorldPosition);
   updateAimPreview(CurrentPointerWorldPosition);
   PointerEventData.preventDefault();
 }
@@ -3106,6 +3322,7 @@ function handlePointerUp(PointerEventData) {
 
   const CurrentPointerWorldPosition = getPointerWorldPosition(PointerEventData);
   if (CurrentPointerWorldPosition) {
+    LastAimPointerWorldPosition.copy(CurrentPointerWorldPosition);
     updateAimPreview(CurrentPointerWorldPosition);
   }
 
@@ -3133,6 +3350,7 @@ function handlePointerUp(PointerEventData) {
   LaunchIgnoredWorldIdentifier = IsLaunchingFromSeedstone ? null : CurrentWorldIdentifier;
   LaunchIgnoredBodyIdentifier = IsLaunchingFromSeedstone ? SeedstoneDefinition.id : null;
   if (IsLaunchingFromSeedstone) {
+    AttachedSeedstoneSurfaceOffset = null;
     SeedstoneUsesRemaining = 0;
     SeedstoneCrumbleStartedAtSeconds = GameElapsedTimeSeconds;
     showStatusToast(`${SeedstoneDefinition.label} SPENT`, 650);
@@ -3188,6 +3406,7 @@ function recoverSeedFromVoid(StatusMessage = 'LOST TO THE VOID') {
       LastSafeSeedPosition.z,
     );
     CurrentWorldIdentifier = LastSafeWorldIdentifier;
+    AttachedSeedstoneSurfaceOffset = null;
     publishAttachedSeedState(CurrentWorldIdentifier, LastSafeSeedPosition);
     LaunchIgnoredWorldIdentifier = null;
     LaunchIgnoredBodyIdentifier = null;
@@ -3202,6 +3421,10 @@ function recoverSeedFromVoid(StatusMessage = 'LOST TO THE VOID') {
  */
 function simulateSeedFixedStep() {
   PhysicsElapsedTimeSeconds += FixedPhysicsStepSeconds;
+  synchronizeSeedstonePosition();
+  if (IsPointerAiming && GamePhase === 'attached') {
+    updateAimPreview(LastAimPointerWorldPosition);
+  }
   if (GamePhase !== 'flying') {
     return;
   }
@@ -3278,7 +3501,7 @@ function simulateSeedFixedStep() {
   }
 
   if (CollisionBody?.definition.kind === 'seedstone') {
-    attachSeedToSeedstone(SeedPhysicsState.position);
+    attachSeedToSeedstone(SeedPhysicsState.position, CollisionBody.position);
     return;
   }
 
@@ -3526,6 +3749,13 @@ function updateSeedVisuals(DeltaTimeSeconds, ElapsedTimeSeconds) {
     SeedPhysicsState.position.y,
     SeedPhysicsState.position.z,
   );
+  RouteLabelProjection.copy(SeedGroup.position).project(Camera);
+  GameCanvas.dataset.seedScreenX = String(Math.round(
+    (RouteLabelProjection.x * 0.5 + 0.5) * window.innerWidth,
+  ));
+  GameCanvas.dataset.seedScreenY = String(Math.round(
+    (-RouteLabelProjection.y * 0.5 + 0.5) * window.innerHeight,
+  ));
 
   SeedCoreMesh.rotation.x += DeltaTimeSeconds * (GamePhase === 'flying' ? 4.5 : 0.8);
   SeedCoreMesh.rotation.y += DeltaTimeSeconds * (GamePhase === 'flying' ? 6.0 : 1.2);
@@ -3806,6 +4036,7 @@ function resetGame() {
   LaunchIgnoredBodyIdentifier = null;
   SeedstoneUsesRemaining = SeedstoneDefinition.uses;
   SeedstoneCrumbleStartedAtSeconds = null;
+  AttachedSeedstoneSurfaceOffset = null;
   WorldheartDefinition.routeAvailable = WorldheartDefinition.routeAvailableInitially === true;
   WorldheartDefinition.restored = WorldheartDefinition.initiallyRestored === true;
   WorldheartJustUnlocked = false;
@@ -3817,6 +4048,7 @@ function resetGame() {
   PhysicsAccumulatorSeconds = 0;
   PhysicsElapsedTimeSeconds = 0;
   GameElapsedTimeSeconds = 0;
+  synchronizeSeedstonePosition();
 
   TemporaryThreeVector.set(
     StartingWorldDefinition.position.x - FirstTargetWorldDefinition.position.x,

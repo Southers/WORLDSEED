@@ -10,7 +10,10 @@ The polished Meadow → Ember → Frost journey is the prologue and visual bench
 
 The current `main` build is deployed at **https://southers.github.io/WORLDSEED/**.
 
-The in-development Broken Belt chapter can be selected directly at **https://southers.github.io/WORLDSEED/?system=broken-belt**.
+The authored chapters can also be selected directly for development and replay:
+
+- **Broken Belt:** https://southers.github.io/WORLDSEED/?system=broken-belt
+- **Wandering Garden:** https://southers.github.io/WORLDSEED/?system=wandering-garden
 
 ### Release smoke test
 
@@ -38,6 +41,8 @@ The current build includes:
 - a validated authored-system definition that keeps world physics, visual identity, story, tactical bodies, route emphasis, objectives and mastery content together;
 - isolated mutable runtime state cloned from authored content so Reset and future systems do not mutate their source definitions;
 - a selectable six-world Broken Belt chapter with Relay/Kiln/Loom/Shard/Drift/Vault routes, a tactical Splinter, the orbiting Sentinel and a physical Belt Heart exit;
+- a selectable six-world Wandering Garden chapter with a deterministic orbiting Pollen Moon that carries the attached seed, a moving Thornwing hazard and a physical Garden Heart exit;
+- six new low-cost Garden silhouettes—sheltering arches, flower lamps, clustered treetops, giant petals, droplets and woven ribs—restored through the existing planet-wrapping wave;
 - six low-cost authored silhouettes whose signal rings, vents, linked arches, crystal crown, wave crests and vault ribs grow inside the same one-call restoration surface;
 - two suggested route choices with world-space HUD labels and a single instanced beacon draw call;
 - persistent restored launch nodes, so landing order changes the next useful geometry;
@@ -71,7 +76,9 @@ The current playable build is the tactical First Light prototype and compatibili
 
 Broken Belt is the first content-pipeline chapter. Relay opens toward the safe direct Kiln route or the higher Loom route, whose curved prediction collects all three Arc motes. Kiln continues naturally toward Drift, while Vault offers a compact setup angle toward Shard and the Belt Heart. Three awakenings open the exit; Shard and Loom remain optional depending on route order, so Heart, Bloom and Arc represent genuinely different goals. Browser evidence covers both desktop openings and a complete 390×844 Relay → Kiln → Drift → Vault → Shard → Belt Heart run at 22 peak draw calls.
 
-Completing First Light now offers **Continue to BROKEN BELT** in the Worldheart summary. Completing the current campaign frontier offers **Replay BROKEN BELT** instead, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
+Wandering Garden is the first moving-launch chapter. Bower again opens with two immediately legible worlds, but the orbiting Pollen Moon periodically crosses useful trajectories. Landing on it does not increase world progress: instead the seed rides the cyan orbit until the player chooses a changing launch angle, after which the moon crumbles. Thornwing guards the Crown side of the Garden and rewards waiting or changing destination. Three awakenings open the Garden Heart while two worlds remain optional for Bloom. Browser evidence covers the desktop Bower → Lantern → Pollen Moon interaction and a complete 390×844 timed Pollen Moon → Nest → Crown → Canopy → Garden Heart run, including hazard recovery and close-pass feedback, with no console warnings or errors.
+
+Completing First Light offers **Continue to BROKEN BELT**, and completing Broken Belt offers **Continue to WANDERING GARDEN**. The current frontier offers **Replay WANDERING GARDEN**, preserving a clear journey without hiding direct `?system=<id>` chapter links used for testing and replay.
 
 ### Visual budget
 

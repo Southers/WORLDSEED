@@ -6,6 +6,7 @@ import {
   DefaultAuthoredSystemIdentifier,
   BrokenBeltSystemDefinition,
   FirstLightSystemDefinition,
+  WanderingGardenSystemDefinition,
   AuthoredCampaignSystemIdentifiers,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
@@ -20,6 +21,16 @@ test('First Light satisfies the authored-system content contract', () => {
 test('Broken Belt satisfies the authored-system content contract', () => {
   assert.deepEqual(validateAuthoredSystemDefinition(BrokenBeltSystemDefinition), []);
   assert.equal(BrokenBeltSystemDefinition.worlds.length, 6);
+});
+
+test('Wandering Garden satisfies the moving-system content contract', () => {
+  assert.deepEqual(validateAuthoredSystemDefinition(WanderingGardenSystemDefinition), []);
+  assert.equal(WanderingGardenSystemDefinition.worlds.length, 6);
+  const PollenMoonDefinition = WanderingGardenSystemDefinition.tacticalBodies.find(
+    (BodyDefinition) => BodyDefinition.id === 'pollen-moon',
+  );
+  assert.ok(PollenMoonDefinition.orbit);
+  assert.ok(PollenMoonDefinition.orbit.angularSpeedRadiansPerSecond > 0);
 });
 
 test('runtime creation isolates mutable play state from authored content', () => {
@@ -41,18 +52,85 @@ test('runtime creation isolates mutable play state from authored content', () =>
   assert.equal(FirstLightSystemDefinition.worlds[2].initiallyRestored, false);
 });
 
+test('moving Seedstones preserve isolated deterministic orbit data', () => {
+  const MovingSystemDefinition = structuredClone(FirstLightSystemDefinition);
+  const AuthoredSeedstone = MovingSystemDefinition.tacticalBodies.find(
+    (BodyDefinition) => BodyDefinition.kind === 'seedstone',
+  );
+  AuthoredSeedstone.orbit = {
+    centre: { x: 0.7, y: 1.1, z: 0 },
+    radius: 2.4,
+    phaseRadians: -0.4,
+    angularSpeedRadiansPerSecond: 0.22,
+  };
+
+  assert.deepEqual(validateAuthoredSystemDefinition(MovingSystemDefinition), []);
+  const Runtime = createAuthoredSystemRuntime(MovingSystemDefinition);
+  const RuntimeSeedstone = Runtime.tacticalBodies.find(
+    (BodyDefinition) => BodyDefinition.kind === 'seedstone',
+  );
+  RuntimeSeedstone.orbit.centre.x = 999;
+
+  assert.equal(AuthoredSeedstone.orbit.centre.x, 0.7);
+});
+
+test('content validation rejects malformed moving launch-node orbits', () => {
+  const InvalidSystemDefinition = structuredClone(FirstLightSystemDefinition);
+  const SeedstoneDefinition = InvalidSystemDefinition.tacticalBodies.find(
+    (BodyDefinition) => BodyDefinition.kind === 'seedstone',
+  );
+  SeedstoneDefinition.orbit = {
+    centre: { x: 0, y: 0, z: 0 },
+    radius: 0,
+    phaseRadians: 0,
+    angularSpeedRadiansPerSecond: 0.2,
+  };
+
+  assert.ok(validateAuthoredSystemDefinition(InvalidSystemDefinition).includes(
+    'Tactical body seedstone has an invalid deterministic orbit.',
+  ));
+});
+
 test('system selection falls back to the authored campaign entry', () => {
   assert.equal(DefaultAuthoredSystemIdentifier, 'first-light');
   assert.equal(getAuthoredSystemDefinition('first-light'), FirstLightSystemDefinition);
   assert.equal(getAuthoredSystemDefinition('broken-belt'), BrokenBeltSystemDefinition);
+  assert.equal(
+    getAuthoredSystemDefinition('wandering-garden'),
+    WanderingGardenSystemDefinition,
+  );
   assert.equal(getAuthoredSystemDefinition('missing-system'), FirstLightSystemDefinition);
 });
 
-test('campaign order advances from First Light and leaves the frontier replayable', () => {
-  assert.deepEqual(AuthoredCampaignSystemIdentifiers, ['first-light', 'broken-belt']);
+test('campaign order advances through the Garden and leaves the frontier replayable', () => {
+  assert.deepEqual(
+    AuthoredCampaignSystemIdentifiers,
+    ['first-light', 'broken-belt', 'wandering-garden'],
+  );
   assert.equal(getNextAuthoredSystemIdentifier('first-light'), 'broken-belt');
-  assert.equal(getNextAuthoredSystemIdentifier('broken-belt'), null);
+  assert.equal(getNextAuthoredSystemIdentifier('broken-belt'), 'wandering-garden');
+  assert.equal(getNextAuthoredSystemIdentifier('wandering-garden'), null);
   assert.equal(getNextAuthoredSystemIdentifier('missing-system'), null);
+});
+
+test('Wandering Garden makes its moving moon a genuine authored route choice', () => {
+  const Runtime = createAuthoredSystemRuntime(WanderingGardenSystemDefinition);
+  const CampaignNodes = [
+    ...Runtime.worlds,
+    ...Runtime.tacticalBodies.filter((BodyDefinition) => BodyDefinition.kind !== 'hazard'),
+  ];
+  Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'canopy').restored = true;
+
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'canopy', 2, Runtime.routeSuggestions.canopy)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['pollen-moon', 'crown'],
+  );
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'pollen-moon', 2, Runtime.routeSuggestions['pollen-moon'])
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['crown', 'nest'],
+  );
 });
 
 test('Broken Belt landing order exposes distinct authored continuations', () => {
