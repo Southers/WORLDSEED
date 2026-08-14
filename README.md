@@ -10,6 +10,8 @@ The polished Meadow → Ember → Frost journey is the prologue and visual bench
 
 The current `main` build is deployed at **https://southers.github.io/WORLDSEED/**.
 
+The in-development Broken Belt chapter can be selected directly at **https://southers.github.io/WORLDSEED/?system=broken-belt**.
+
 ### Release smoke test
 
 Use a clean browser at a desktop viewport and again at a portrait mobile viewport:
@@ -35,6 +37,8 @@ The current build includes:
 - outcome-driven landings on any physical destination rather than a scripted target order;
 - a validated authored-system definition that keeps world physics, visual identity, story, tactical bodies, route emphasis, objectives and mastery content together;
 - isolated mutable runtime state cloned from authored content so Reset and future systems do not mutate their source definitions;
+- a selectable six-world Broken Belt chapter with Relay/Kiln/Loom/Shard/Drift/Vault routes, a tactical Splinter, the orbiting Sentinel and a physical Belt Heart exit;
+- six low-cost authored silhouettes whose signal rings, vents, linked arches, crystal crown, wave crests and vault ribs grow inside the same one-call restoration surface;
 - two suggested route choices with world-space HUD labels and a single instanced beacon draw call;
 - persistent restored launch nodes, so landing order changes the next useful geometry;
 - gold new-world locks, green safe-landing locks and explicit no-landing feedback;
@@ -64,6 +68,8 @@ The current build includes:
 Meadow, Ember and Frost remain the full diorama benchmark. Grove and Tide now carry a deliberate lightweight identity without spending extra draw calls: Grove reveals a joined-root arch, clustered saplings and slow root veins, while Tide reveals moving water bands and repeating crest relief around its circumference. They remain compact route worlds rather than full dioramas, preserving room for the larger authored systems.
 
 The current playable build is the tactical First Light prototype and compatibility fixture for the authored-system pipeline. Grove-first recommends Frost/Ember next, while Ember-first recommends Tide/Frost; authored suggestions prioritise those useful branches but every world remains physically landable. The Seedstone creates an optional setup route, while the asteroid turns launch timing into a visible decision instead of a random failure. The Arc places three optional motes on an expressive Meadow-to-Frost curve: prediction promises the pickup count, and timing Wayfarer determines whether the player completes it. Three awakenings open the Worldheart route; entering it completes Heart immediately, while all four worlds and all three motes separately earn Bloom and Arc. Pipeline browser evidence covers both desktop opening branches, portrait void recovery, the complete Ember → Tide → Frost → Worldheart path and Play again. The measured run peaked at 179 draw calls with a clean console.
+
+Broken Belt is the first content-pipeline chapter. Relay opens toward the safe direct Kiln route or the higher Loom route, whose curved prediction collects all three Arc motes. Kiln continues naturally toward Drift, while Vault offers a compact setup angle toward Shard and the Belt Heart. Three awakenings open the exit; Shard and Loom remain optional depending on route order, so Heart, Bloom and Arc represent genuinely different goals. Browser evidence covers both desktop openings and a complete 390×844 Relay → Kiln → Drift → Vault → Shard → Belt Heart run at 22 peak draw calls.
 
 ### Visual budget
 

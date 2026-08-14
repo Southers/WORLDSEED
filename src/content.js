@@ -52,6 +52,9 @@ export function validateAuthoredSystemDefinition(SystemDefinition) {
   if (!SystemDefinition.label || typeof SystemDefinition.label !== 'string') {
     Errors.push('Authored system requires a display label.');
   }
+  if (!SystemDefinition.openingBody || typeof SystemDefinition.openingBody !== 'string') {
+    Errors.push('Authored system requires openingBody story copy.');
+  }
   const CompletionDefinition = SystemDefinition.completion;
   for (const CompletionField of [
     'eyebrow', 'title', 'perfectTitle', 'body', 'perfectBody',
@@ -345,6 +348,7 @@ export function createAuthoredSystemRuntime(
   return {
     id: SystemDefinition.id,
     label: SystemDefinition.label,
+    openingBody: SystemDefinition.openingBody,
     completion: { ...SystemDefinition.completion },
     constellation: {
       nodes: SystemDefinition.constellation.nodes.map((NodeDefinition) => ({
@@ -374,6 +378,7 @@ export function createAuthoredSystemRuntime(
 export const FirstLightSystemDefinition = {
   id: 'first-light',
   label: 'FIRST LIGHT',
+  openingBody: 'Carry the last living seed onward. Pull away from a gold ring, then release.',
   completion: {
     eyebrow: 'FIRST LIGHT RECONNECTED',
     title: 'The Worldheart hears you.',
@@ -494,10 +499,154 @@ export const FirstLightSystemDefinition = {
   ],
 };
 
+/** The first full chapter: a fractured relay system held together by remembered routes. */
+export const BrokenBeltSystemDefinition = {
+  id: 'broken-belt',
+  label: 'BROKEN BELT',
+  openingBody: 'The Belt is coming apart. Choose which lost signal to wake first.',
+  completion: {
+    eyebrow: 'THE BROKEN BELT HOLDS',
+    title: 'The first lost system answers.',
+    perfectTitle: 'Every broken signal is singing.',
+    body: 'A repaired path points deeper into the dark. Return for the dim emblems whenever you like.',
+    perfectBody: 'Every world and every arc now carries life across the Belt.',
+  },
+  constellation: {
+    nodes: [
+      { id: 'relay', label: 'Relay', x: 22, y: 72 },
+      { id: 'loom', label: 'Loom', x: 58, y: 34 },
+      { id: 'shard', label: 'Shard', x: 112, y: 16 },
+      { id: 'drift', label: 'Drift', x: 174, y: 30 },
+      { id: 'kiln', label: 'Kiln', x: 112, y: 72 },
+      { id: 'vault', label: 'Vault', x: 94, y: 46 },
+      { id: 'belt-heart', label: 'Belt Heart', x: 216, y: 68, isHeart: true },
+    ],
+    edges: [
+      ['relay', 'loom'], ['relay', 'kiln'], ['loom', 'shard'],
+      ['loom', 'vault'], ['kiln', 'vault'], ['kiln', 'drift'],
+      ['vault', 'shard'], ['vault', 'drift'], ['shard', 'drift'],
+      ['drift', 'belt-heart'], ['shard', 'belt-heart'],
+    ],
+  },
+  startingWorldIdentifier: 'relay',
+  openingGuideTargetIdentifier: 'kiln',
+  worldheartUnlockThreshold: 3,
+  routeSuggestions: {
+    relay: ['loom', 'kiln'],
+    loom: ['belt-heart', 'shard', 'vault', 'kiln'],
+    kiln: ['belt-heart', 'drift', 'vault', 'shard'],
+    vault: ['belt-heart', 'shard', 'drift', 'loom'],
+    shard: ['belt-heart', 'drift', 'loom'],
+    drift: ['belt-heart', 'shard', 'kiln'],
+    splinter: ['kiln', 'vault'],
+  },
+  worlds: [
+    {
+      id: 'relay', label: 'RELAY', visualKey: 'relay',
+      position: { x: -8, y: -6.4, z: 0 }, radius: 3.35, gravitationalParameter: 92,
+      aliveColor: 0x658f84, atmosphereColor: 0xa7e1c7, accentColor: 0xf4dc8f,
+      initiallyRestored: true, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'One relay had kept calling into the dark.',
+      restoration: {
+        durationSeconds: 2.2, waveWidth: 0.045, growthTrailWidth: 0.18,
+        waveColor: 0xf6edbd, atmosphereOpacity: 0, rotationSpeed: 0.00045,
+        surfaceVariation: 0.08,
+      },
+    },
+    {
+      id: 'kiln', label: 'KILN', visualKey: 'kiln',
+      position: { x: 7.8, y: -3.3, z: 0 }, radius: 3, gravitationalParameter: 82,
+      aliveColor: 0xb76545, atmosphereColor: 0xffad72, accentColor: 0xffcf76,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'The furnaces had guarded one patient coal.',
+      restoration: {
+        durationSeconds: 2.3, waveWidth: 0.048, growthTrailWidth: 0.18,
+        waveColor: 0xffd9a0, atmosphereOpacity: 0, rotationSpeed: 0.00115,
+        surfaceVariation: 0.05,
+      },
+    },
+    {
+      id: 'loom', label: 'LOOM', visualKey: 'loom',
+      position: { x: -8.8, y: 3, z: 0 }, radius: 2.05, gravitationalParameter: 44,
+      aliveColor: 0x789a7c, atmosphereColor: 0xb9e2c5, accentColor: 0xcfe89a,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'Its old bridges still remembered every neighbour.',
+      restoration: {
+        durationSeconds: 1.9, waveWidth: 0.055, growthTrailWidth: 0.2,
+        waveColor: 0xe4f8bd, atmosphereOpacity: 0, rotationSpeed: 0.00065,
+        surfaceVariation: 0.09,
+      },
+    },
+    {
+      id: 'shard', label: 'SHARD', visualKey: 'shard',
+      position: { x: 0.7, y: 8, z: 0 }, radius: 3.55, gravitationalParameter: 102,
+      aliveColor: 0x7085a8, atmosphereColor: 0xb9cdf9, accentColor: 0xd8e5ff,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'The broken crystal held a map in every face.',
+      restoration: {
+        durationSeconds: 2.55, waveWidth: 0.042, growthTrailWidth: 0.2,
+        waveColor: 0xe9f2ff, atmosphereOpacity: 0, rotationSpeed: 0.00095,
+        surfaceVariation: 0.04,
+      },
+    },
+    {
+      id: 'drift', label: 'DRIFT', visualKey: 'drift',
+      position: { x: 9.7, y: 6, z: 0 }, radius: 2.15, gravitationalParameter: 48,
+      aliveColor: 0x3e7895, atmosphereColor: 0x8fdbe6, accentColor: 0xb1f0e0,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 2,
+      memory: 'A quiet current was still circling home.',
+      restoration: {
+        durationSeconds: 1.95, waveWidth: 0.052, growthTrailWidth: 0.2,
+        waveColor: 0xbdf6ff, atmosphereOpacity: 0, rotationSpeed: 0.00082,
+        surfaceVariation: 0.06,
+      },
+    },
+    {
+      id: 'vault', label: 'VAULT', visualKey: 'vault',
+      position: { x: 3.5, y: 1, z: 0 }, radius: 1.45, gravitationalParameter: 18,
+      aliveColor: 0x7c6c91, atmosphereColor: 0xcbb8e1, accentColor: 0xf2d59c,
+      initiallyRestored: false, usesMergedSurfaceLandmarks: true, biomeStyle: 1,
+      memory: 'Inside the little vault, names were waiting to be spoken.',
+      restoration: {
+        durationSeconds: 1.7, waveWidth: 0.06, growthTrailWidth: 0.22,
+        waveColor: 0xf4ddbd, atmosphereOpacity: 0, rotationSpeed: 0.00055,
+        surfaceVariation: 0.07,
+      },
+    },
+  ],
+  tacticalBodies: [
+    {
+      id: 'splinter', label: 'SPLINTER', kind: 'seedstone',
+      position: { x: -2.3, y: -1.8, z: 0 }, radius: 0.68, uses: 1,
+      initiallyRestored: true, countsTowardRestoration: false,
+    },
+    {
+      id: 'sentinel', label: 'SENTINEL', kind: 'hazard', radius: 0.68,
+      countsTowardRestoration: false,
+      orbit: {
+        centre: { x: 0.7, y: 8, z: 0 }, radius: 5.35,
+        phaseRadians: -1.18, angularSpeedRadiansPerSecond: 0.34,
+      },
+    },
+    {
+      id: 'belt-heart', label: 'BELT HEART', kind: 'worldheart',
+      position: { x: -4.35, y: 8.75, z: 0 }, radius: 0.9,
+      initiallyRestored: false, countsTowardRestoration: false,
+      isRouteDestination: true, routeAvailableInitially: false,
+    },
+  ],
+  stardust: [
+    { id: 'broken-belt-arc-1', position: { x: -4.946, y: -3.769, z: 0 } },
+    { id: 'broken-belt-arc-2', position: { x: -5.718, y: -2.29, z: 0 } },
+    { id: 'broken-belt-arc-3', position: { x: -6.525, y: -0.946, z: 0 } },
+  ],
+};
+
 export const DefaultAuthoredSystemIdentifier = FirstLightSystemDefinition.id;
 
 export const AuthoredSystemDefinitions = {
   [FirstLightSystemDefinition.id]: FirstLightSystemDefinition,
+  [BrokenBeltSystemDefinition.id]: BrokenBeltSystemDefinition,
 };
 
 /** Resolves a requested authored system and safely falls back to the campaign entry. */

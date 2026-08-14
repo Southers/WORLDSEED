@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7g';
+import { WorldseedAudio } from './audio.js?v=20260814-7l';
 
 import {
   DefaultAuthoredSystemIdentifier,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
-} from './content.js?v=20260814-7g';
+} from './content.js?v=20260814-7l';
 
 import {
   countRestoredWorlds,
@@ -17,7 +17,7 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260814-7g';
+} from './campaign.js?v=20260814-7l';
 
 import {
   calculateBodyPositionAtTime,
@@ -27,12 +27,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7g';
+} from './physics.js?v=20260814-7l';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7g';
+} from './restoration.js?v=20260814-7l';
 
 const RequestedSystemIdentifier = new URLSearchParams(window.location.search).get('system')
   ?? DefaultAuthoredSystemIdentifier;
@@ -99,7 +99,7 @@ const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
 configureSystemInterface();
-GameCanvas.dataset.build = '20260814-7g';
+GameCanvas.dataset.build = '20260814-7l';
 GameCanvas.dataset.system = ActiveSystem.id;
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
@@ -112,6 +112,7 @@ const MinimumLaunchDragDistance = 0.22;
 const MaximumTrajectoryPredictionSteps = 520;
 const OutOfBoundsDistance = 34;
 const StartingWorldIdentifier = ActiveSystem.startingWorldIdentifier;
+GameCanvas.dataset.currentNode = StartingWorldIdentifier;
 const MaximumDrawCallBudget = 180;
 const WorldheartUnlockThreshold = ActiveSystem.worldheartUnlockThreshold;
 const StardustPickupRadius = 0.22;
@@ -449,7 +450,7 @@ function createRestorationSurfaceMaterial(WorldDefinition) {
         '#include <begin_vertex>',
         `#include <begin_vertex>
         float landmarkGrowth = smoothstep(-0.02, 0.72, restorationProgress);
-        transformed *= mix(1.0, 0.16 + (landmarkGrowth * 0.84), landmarkMask);`,
+        transformed *= mix(1.0, 0.28 + (landmarkGrowth * 0.72), landmarkMask);`,
       );
     Shader.fragmentShader = Shader.fragmentShader
       .replace(
@@ -577,8 +578,8 @@ function createRestorationWaveShell(WorldDefinition, RestorationUniforms) {
   });
   const WaveGeometry = new THREE.SphereGeometry(
     WorldDefinition.radius * 1.018,
-    WorldDefinition.isPrototypeWorld ? 32 : 64,
-    WorldDefinition.isPrototypeWorld ? 20 : 40,
+    usesMergedSurfaceLandmarks(WorldDefinition) ? 32 : 64,
+    usesMergedSurfaceLandmarks(WorldDefinition) ? 20 : 40,
   );
   const WaveMesh = new THREE.Mesh(WaveGeometry, WaveMaterial);
   WaveMesh.visible = false;
@@ -789,15 +790,147 @@ function mergeRestorationGeometries(Geometries) {
   return MergedGeometry;
 }
 
-/** Builds Grove's joined-root arch and clustered saplings into its existing surface call. */
-function createGroveSurfaceGeometry(WorldDefinition) {
+/** Starts one lightweight authored world with a faceted restorable sphere. */
+function createMergedWorldSurfaceBase(WorldDefinition) {
   const BaseSourceGeometry = new THREE.IcosahedronGeometry(WorldDefinition.radius, 3);
   const BaseGeometry = BaseSourceGeometry.index
     ? BaseSourceGeometry.toNonIndexed()
     : BaseSourceGeometry.clone();
   BaseSourceGeometry.dispose();
   addRestorationGeometryAttributes(BaseGeometry);
-  const Geometries = [BaseGeometry];
+  return [BaseGeometry];
+}
+
+/** Builds Relay's three fractured signal rings into its surface draw call. */
+function createRelaySurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const RingSource = new THREE.TorusGeometry(
+    WorldDefinition.radius * 1.06,
+    0.095,
+    5,
+    42,
+  );
+  const RingRotations = [
+    { x: 0.08, y: 0.18 },
+    { x: 1.03, y: -0.34 },
+    { x: -0.82, y: 0.7 },
+  ];
+  for (const RingRotation of RingRotations) {
+    const RingGeometry = RingSource.index
+      ? RingSource.toNonIndexed()
+      : RingSource.clone();
+    RingGeometry.rotateX(RingRotation.x);
+    RingGeometry.rotateY(RingRotation.y);
+    addRestorationGeometryAttributes(RingGeometry, null, 1);
+    Geometries.push(RingGeometry);
+  }
+  RingSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Kiln's crown of dormant exhaust stacks into its surface draw call. */
+function createKilnSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const VentSource = new THREE.ConeGeometry(0.28, 1.15, 6, 1, true);
+  VentSource.translate(0, 0.575, 0);
+  const VentDirections = [
+    new THREE.Vector3(-0.58, 0.2, 0.82),
+    new THREE.Vector3(-0.18, 0.54, 0.84),
+    new THREE.Vector3(0.28, 0.48, 0.86),
+    new THREE.Vector3(0.62, 0.08, 0.8),
+    new THREE.Vector3(0.12, -0.46, 0.9),
+  ];
+  VentDirections.forEach((VentDirection, VentIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      VentSource,
+      VentDirection,
+      WorldDefinition.radius - 0.04,
+      0.85 + ((VentIndex % 3) * 0.13),
+      VentIndex * 0.53,
+    ));
+  });
+  VentSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Loom's linked route arches around the world in one draw call. */
+function createLoomSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const ArchSource = new THREE.TorusGeometry(0.7, 0.11, 5, 20, Math.PI);
+  const ArchYaws = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
+  for (const ArchYaw of ArchYaws) {
+    Geometries.push(createFrontLandmarkGeometry(
+      ArchSource,
+      WorldDefinition.radius + 0.08,
+      -0.26,
+      -0.04,
+      0.92,
+      -0.12,
+      ArchYaw,
+    ));
+    Geometries.push(createFrontLandmarkGeometry(
+      ArchSource,
+      WorldDefinition.radius + 0.08,
+      0.26,
+      -0.04,
+      0.92,
+      0.12,
+      ArchYaw,
+    ));
+  }
+  ArchSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Shard's asymmetric crystal crown into its surface draw call. */
+function createShardSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const CrystalSource = new THREE.ConeGeometry(0.34, 1.45, 5);
+  CrystalSource.translate(0, 0.725, 0);
+  const CrystalDirections = [
+    new THREE.Vector3(-0.5, 0.42, 0.82),
+    new THREE.Vector3(-0.1, 0.68, 0.76),
+    new THREE.Vector3(0.32, 0.52, 0.82),
+    new THREE.Vector3(0.58, 0.05, 0.84),
+    new THREE.Vector3(-0.18, -0.42, 0.9),
+    new THREE.Vector3(0.38, -0.35, 0.88),
+  ];
+  CrystalDirections.forEach((CrystalDirection, CrystalIndex) => {
+    Geometries.push(createPlacedLandmarkGeometry(
+      CrystalSource,
+      CrystalDirection,
+      WorldDefinition.radius - 0.06,
+      0.72 + ((CrystalIndex % 4) * 0.18),
+      CrystalIndex * 0.64,
+    ));
+  });
+  CrystalSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Vault's protective ribs around its memory core in one draw call. */
+function createVaultSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
+  const RibSource = new THREE.TorusGeometry(0.82, 0.1, 5, 24, Math.PI);
+  const RibYaws = [0, Math.PI * 0.5, Math.PI, -Math.PI * 0.5];
+  RibYaws.forEach((RibYaw, RibIndex) => {
+    Geometries.push(createFrontLandmarkGeometry(
+      RibSource,
+      WorldDefinition.radius + 0.1,
+      0,
+      -0.08,
+      0.92 + ((RibIndex % 2) * 0.08),
+      (RibIndex % 2 === 0 ? -1 : 1) * 0.14,
+      RibYaw,
+    ));
+  });
+  RibSource.dispose();
+  return mergeRestorationGeometries(Geometries);
+}
+
+/** Builds Grove's joined-root arch and clustered saplings into its existing surface call. */
+function createGroveSurfaceGeometry(WorldDefinition) {
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
 
   const RootArchSource = new THREE.TorusGeometry(0.92, 0.14, 5, 20, Math.PI);
   Geometries.push(createFrontLandmarkGeometry(
@@ -844,13 +977,7 @@ function createGroveSurfaceGeometry(WorldDefinition) {
 
 /** Builds Tide's three repeating wave crests into its existing surface call. */
 function createTideSurfaceGeometry(WorldDefinition) {
-  const BaseSourceGeometry = new THREE.IcosahedronGeometry(WorldDefinition.radius, 3);
-  const BaseGeometry = BaseSourceGeometry.index
-    ? BaseSourceGeometry.toNonIndexed()
-    : BaseSourceGeometry.clone();
-  BaseSourceGeometry.dispose();
-  addRestorationGeometryAttributes(BaseGeometry);
-  const Geometries = [BaseGeometry];
+  const Geometries = createMergedWorldSurfaceBase(WorldDefinition);
   const WaveCrestSource = new THREE.TorusGeometry(0.75, 0.16, 5, 18, Math.PI);
   const WaveCrestRows = [
     { y: 0.52, scale: 0.7, rotation: 0.08 },
@@ -876,17 +1003,29 @@ function createTideSurfaceGeometry(WorldDefinition) {
 }
 
 /** Selects one-call authored geometry for lightweight route worlds. */
-function createPrototypeSurfaceGeometry(WorldDefinition) {
-  const PrototypeGeometryFactories = {
+function createMergedSurfaceGeometry(WorldDefinition) {
+  const MergedGeometryFactories = {
     grove: createGroveSurfaceGeometry,
     tide: createTideSurfaceGeometry,
+    relay: createRelaySurfaceGeometry,
+    kiln: createKilnSurfaceGeometry,
+    loom: createLoomSurfaceGeometry,
+    shard: createShardSurfaceGeometry,
+    drift: createTideSurfaceGeometry,
+    vault: createVaultSurfaceGeometry,
   };
   return (
-    PrototypeGeometryFactories[WorldDefinition.visualKey]
+    MergedGeometryFactories[WorldDefinition.visualKey]
     ?? ((Definition) => addRestorationGeometryAttributes(
       new THREE.IcosahedronGeometry(Definition.radius, 3),
     ))
   )(WorldDefinition);
+}
+
+/** Distinguishes low-cost merged landmark worlds from full multi-mesh dioramas. */
+function usesMergedSurfaceLandmarks(WorldDefinition) {
+  return WorldDefinition.usesMergedSurfaceLandmarks === true
+    || WorldDefinition.isPrototypeWorld === true;
 }
 
 /** Creates Meadow's authored low-poly cottage landmark. */
@@ -1526,8 +1665,9 @@ function createWorld(WorldDefinition) {
     WorldDefinition.position.z,
   );
 
-  const SurfaceGeometry = WorldDefinition.isPrototypeWorld
-    ? createPrototypeSurfaceGeometry(WorldDefinition)
+  const UsesMergedSurfaceLandmarks = usesMergedSurfaceLandmarks(WorldDefinition);
+  const SurfaceGeometry = UsesMergedSurfaceLandmarks
+    ? createMergedSurfaceGeometry(WorldDefinition)
     : addRestorationGeometryAttributes(new THREE.IcosahedronGeometry(
       WorldDefinition.radius,
       5,
@@ -1535,7 +1675,7 @@ function createWorld(WorldDefinition) {
   const SurfaceRestoration = createRestorationSurfaceMaterial(WorldDefinition);
   const SurfaceMaterial = SurfaceRestoration.material;
   const SurfaceMesh = new THREE.Mesh(SurfaceGeometry, SurfaceMaterial);
-  SurfaceMesh.castShadow = !WorldDefinition.isPrototypeWorld;
+  SurfaceMesh.castShadow = !UsesMergedSurfaceLandmarks;
   SurfaceMesh.receiveShadow = true;
   WorldGroup.add(SurfaceMesh);
 
@@ -1548,8 +1688,8 @@ function createWorld(WorldDefinition) {
   let AtmosphereMaterial;
   let AtmosphereMesh;
   let ContourRingGroup;
-  if (WorldDefinition.isPrototypeWorld) {
-    /** Greybox choices use the restoration shader but deliberately add no extra draw calls. */
+  if (UsesMergedSurfaceLandmarks) {
+    /** Merged landmarks preserve a strong silhouette without extra atmosphere draw calls. */
     AtmosphereMaterial = { opacity: 0 };
     AtmosphereMesh = new THREE.Object3D();
     ContourRingGroup = new THREE.Group();
@@ -1578,7 +1718,7 @@ function createWorld(WorldDefinition) {
     ember: createEmberSurfaceProps,
     frost: createFrostSurfaceProps,
   };
-  const SurfaceMarkerGroup = WorldDefinition.isPrototypeWorld
+  const SurfaceMarkerGroup = UsesMergedSurfaceLandmarks
     ? new THREE.Group()
     : (
       SurfacePropFactories[WorldDefinition.visualKey] ?? createPlaceholderSurfaceProps
@@ -1599,7 +1739,7 @@ function createWorld(WorldDefinition) {
   }
 
   WorldGroup.add(SurfaceMarkerGroup);
-  const AmbientMoteGroup = WorldDefinition.isPrototypeWorld
+  const AmbientMoteGroup = UsesMergedSurfaceLandmarks
     ? null
     : (
       WorldDefinition.visualKey === 'meadow'
@@ -1947,6 +2087,13 @@ function getWorldDefinition(WorldIdentifier) {
   return WorldDefinitions.find((WorldDefinition) => WorldDefinition.id === WorldIdentifier);
 }
 
+/** Publishes low-frequency attached state for browser verification and route tuning. */
+function publishAttachedSeedState(NodeIdentifier, Position) {
+  GameCanvas.dataset.currentNode = NodeIdentifier;
+  GameCanvas.dataset.seedWorldX = Position.x.toFixed(3);
+  GameCanvas.dataset.seedWorldY = Position.y.toFixed(3);
+}
+
 /** Returns the collision bodies that are active at the current campaign state. */
 function getActiveTacticalBodyDefinitions() {
   return TacticalBodyDefinitions.filter((BodyDefinition) => (
@@ -2134,9 +2281,17 @@ function updateTacticalBodies(ElapsedTimeSeconds) {
 
   const TacticalLabelDefinitions = [
     SeedstoneUsesRemaining > 0
-      ? { definition: SeedstoneDefinition, position: SeedstoneDefinition.position, text: 'SEEDSTONE · 1 USE' }
+      ? {
+        definition: SeedstoneDefinition,
+        position: SeedstoneDefinition.position,
+        text: `${SeedstoneDefinition.label} · 1 USE`,
+      }
       : null,
-    { definition: AsteroidDefinition, position: AsteroidPosition, text: 'ASTEROID · MOVING' },
+    {
+      definition: AsteroidDefinition,
+      position: AsteroidPosition,
+      text: `${AsteroidDefinition.label} · MOVING`,
+    },
     null,
   ];
   for (let LabelIndex = 0; LabelIndex < TacticalLabelElements.length; LabelIndex += 1) {
@@ -2530,6 +2685,7 @@ function attachSeedToWorld(WorldDefinition, ImpactPosition) {
   SeedGroup.position.set(SurfaceRestPosition.x, SurfaceRestPosition.y, SurfaceRestPosition.z);
 
   CurrentWorldIdentifier = WorldDefinition.id;
+  publishAttachedSeedState(CurrentWorldIdentifier, SurfaceRestPosition);
   LastSafeWorldIdentifier = WorldDefinition.id;
   LastSafeSeedPosition = createVector(
     SurfaceRestPosition.x,
@@ -2581,13 +2737,16 @@ function attachSeedToSeedstone(ImpactPosition) {
   };
   SeedGroup.position.set(SurfaceRestPosition.x, SurfaceRestPosition.y, SurfaceRestPosition.z);
   CurrentWorldIdentifier = SeedstoneDefinition.id;
+  publishAttachedSeedState(CurrentWorldIdentifier, SurfaceRestPosition);
   LaunchIgnoredWorldIdentifier = null;
   LaunchIgnoredBodyIdentifier = null;
   GamePhase = 'attached';
   GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
   resetFlightFeedback();
   showStatusToast(
-    LandingAccolade ? `${LandingAccolade} · SEEDSTONE READY` : 'SEEDSTONE READY · 1 LAUNCH',
+    LandingAccolade
+      ? `${LandingAccolade} · ${SeedstoneDefinition.label} READY`
+      : `${SeedstoneDefinition.label} READY · 1 LAUNCH`,
     1100,
   );
   showInstruction(
@@ -2615,6 +2774,7 @@ function attachSeedToWorldheart(ImpactPosition) {
   SeedPhysicsState = { position: SurfaceRestPosition, velocity: createVector() };
   SeedGroup.position.set(SurfaceRestPosition.x, SurfaceRestPosition.y, SurfaceRestPosition.z);
   CurrentWorldIdentifier = WorldheartDefinition.id;
+  publishAttachedSeedState(CurrentWorldIdentifier, SurfaceRestPosition);
   WorldheartDefinition.restored = true;
   GameCanvas.dataset.lastFlightAccolade = LandingAccolade ?? '';
   resetFlightFeedback();
@@ -2622,7 +2782,7 @@ function attachSeedToWorldheart(ImpactPosition) {
   updateWorldheartObjective();
   updateVictorySummary();
   hideInstruction();
-  showStatusToast('WORLDHEART RECONNECTED', 1100);
+  showStatusToast(`${WorldheartDefinition.label} RECONNECTED`, 1100);
 
   WorldheartCompletionTimeoutIdentifier = window.setTimeout(() => {
     VictoryPanelElement.hidden = false;
@@ -2780,7 +2940,7 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     TrajectoryMaterial.opacity = 0.88;
     LandingMarkerMaterial.color.set(0xff766d);
     AimPanelElement.classList.remove('is-locked');
-    AimLabelElement.textContent = 'ASTEROID COLLISION';
+    AimLabelElement.textContent = `${AsteroidDefinition.label} COLLISION`;
     showInstruction(
       'Red means impact',
       'Wait for the asteroid to move or change the launch angle.',
@@ -2796,7 +2956,7 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     TrajectoryMaterial.opacity = 0.86;
     LandingMarkerMaterial.color.set(0x72d9ff);
     AimPanelElement.classList.add('is-locked');
-    AimLabelElement.textContent = 'SEEDSTONE LOCKED';
+    AimLabelElement.textContent = `${SeedstoneDefinition.label} LOCKED`;
     showInstruction(
       'Release to land on the Seedstone',
       'Blue means a one-use tactical launchpad. It does not awaken a world.',
@@ -2817,7 +2977,7 @@ function updateAimPreview(CurrentPointerWorldPosition) {
     TrajectoryMaterial.opacity = 0.9;
     LandingMarkerMaterial.color.set(0xffd678);
     AimPanelElement.classList.add('is-locked');
-    AimLabelElement.textContent = 'WORLDHEART LOCKED';
+    AimLabelElement.textContent = `${WorldheartDefinition.label} LOCKED`;
     showInstruction(
       'Release to reconnect the Worldheart',
       isSystemRestored(WorldDefinitions)
@@ -2970,7 +3130,7 @@ function handlePointerUp(PointerEventData) {
   if (IsLaunchingFromSeedstone) {
     SeedstoneUsesRemaining = 0;
     SeedstoneCrumbleStartedAtSeconds = GameElapsedTimeSeconds;
-    showStatusToast('SEEDSTONE SPENT', 650);
+    showStatusToast(`${SeedstoneDefinition.label} SPENT`, 650);
   }
   GamePhase = 'flying';
   HasLaunchedOnce = true;
@@ -3023,6 +3183,7 @@ function recoverSeedFromVoid(StatusMessage = 'LOST TO THE VOID') {
       LastSafeSeedPosition.z,
     );
     CurrentWorldIdentifier = LastSafeWorldIdentifier;
+    publishAttachedSeedState(CurrentWorldIdentifier, LastSafeSeedPosition);
     LaunchIgnoredWorldIdentifier = null;
     LaunchIgnoredBodyIdentifier = null;
     GamePhase = 'attached';
@@ -3107,7 +3268,7 @@ function simulateSeedFixedStep() {
     ImpactPulseMesh.visible = true;
     ImpactPulseLifeSeconds = 0.42;
     CameraImpactLifeSeconds = 0.24;
-    recoverSeedFromVoid('ASTEROID IMPACT');
+    recoverSeedFromVoid(`${AsteroidDefinition.label} IMPACT`);
     return;
   }
 
@@ -3203,7 +3364,7 @@ function updateWorldRestorationVisuals(ElapsedTimeSeconds) {
           if (WorldheartJustUnlocked) {
             WorldheartJustUnlocked = false;
             WorldseedSound.worldheartOpen();
-            showStatusToast('WORLDHEART ROUTE OPEN', 1400);
+            showStatusToast(`${WorldheartDefinition.label} ROUTE OPEN`, 1400);
           } else {
             GameCanvas.dataset.lastMemory = WorldDefinition.memory;
             showStatusToast(WorldDefinition.memory, 2100, 'memory');
@@ -3629,6 +3790,7 @@ function resetGame() {
   };
   SeedGroup.position.set(StartingSeedPosition.x, StartingSeedPosition.y, 0);
   CurrentWorldIdentifier = StartingWorldIdentifier;
+  publishAttachedSeedState(CurrentWorldIdentifier, StartingSeedPosition);
   LastSafeWorldIdentifier = StartingWorldIdentifier;
   LastSafeSeedPosition = createVector(
     StartingSeedPosition.x,
@@ -3682,7 +3844,7 @@ function resetGame() {
   );
   showInstruction(
     'Choose ' + OpeningRouteChoices[0].label + ' or ' + OpeningRouteChoices[1].label,
-    'Carry the last living seed onward. Pull away from a gold ring, then release.',
+    ActiveSystem.openingBody,
   );
 }
 
