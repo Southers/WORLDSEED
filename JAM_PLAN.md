@@ -57,7 +57,7 @@ Checkpoint: complete in First Light with an always-visible three-pip Worldheart 
 
 Exit: the player can describe what the seed is doing and why the journey matters.
 
-Checkpoint: first pass implemented in First Light. The opening now names the last living seed and its Worldheart destination; every world carries a concise awakening memory in the existing non-blocking restoration panel; and successful fixed-step flights can report `CLOSE PASS`, `GRAVITY ASSIST` or `CLEAN LANDING` without changing prediction or controls. Route-opening and Arc mastery feedback remain intact. Portrait browser evidence proves the Ember and Tide memories plus an authored Meadow-to-Tide gravity assist. System-level environmental storytelling remains the next art/content pass.
+Checkpoint: complete in First Light. The opening names the last living seed and its Worldheart destination; every world carries a concise awakening memory in the existing non-blocking restoration panel; and successful fixed-step flights can report `CLOSE PASS`, `GRAVITY ASSIST` or `CLEAN LANDING` without changing prediction or controls. Grove now awakens slow root veins, a joined-root arch and saplings; Tide awakens moving water bands and repeating crest relief around its circumference. Both landmark sets are merged into their existing surface draw call and grow through the same restoration shader. Desktop Grove, 390×844 Tide, reset, void recovery, changed follow-up routes and a full mobile Worldheart completion passed in-browser at 179 / 180 peak draw calls with a clean final console.
 
 ## Milestone 5 — The Broken Belt vertical slice
 
