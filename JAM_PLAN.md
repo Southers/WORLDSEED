@@ -72,6 +72,8 @@ Pipeline checkpoint: First Light now runs from a validated pure-data authored-sy
 
 Presentation checkpoint: objective pips, completion copy, constellation nodes and edges now come from the selected authored definition. A registry-backed `?system=<id>` development route safely falls back to First Light and marks the active canvas, giving Broken Belt one presentation path instead of system-specific UI branches.
 
+Playable slice checkpoint: Broken Belt now contains six authored worlds—Relay, Kiln, Loom, Shard, Drift and Vault—plus the one-use Splinter, deterministic Sentinel and physical Belt Heart exit. Relay offers a direct Kiln line or a high Loom line carrying the complete three-mote Arc; the central Vault changes follow-up geometry; three awakenings open the exit while two optional worlds preserve Bloom replay value. Every world has distinct merged landmark geometry, restoration colour and awakening memory. Deterministic tests cover both opening landings, the full Loom Arc and a Shard-to-Belt-Heart prediction/live match. Desktop branch checks and a 390×844 Relay → Kiln → Drift → Vault → Shard → Belt Heart completion establish the first complete chapter route at 22 peak draw calls.
+
 ## Milestone 6 — Authored campaign
 
 - Build the Wandering Garden and Long Night systems using the proven content pipeline.

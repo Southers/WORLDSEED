@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { getRouteChoices } from '../src/campaign.js';
 import {
   DefaultAuthoredSystemIdentifier,
+  BrokenBeltSystemDefinition,
   FirstLightSystemDefinition,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
@@ -12,6 +13,11 @@ import {
 
 test('First Light satisfies the authored-system content contract', () => {
   assert.deepEqual(validateAuthoredSystemDefinition(FirstLightSystemDefinition), []);
+});
+
+test('Broken Belt satisfies the authored-system content contract', () => {
+  assert.deepEqual(validateAuthoredSystemDefinition(BrokenBeltSystemDefinition), []);
+  assert.equal(BrokenBeltSystemDefinition.worlds.length, 6);
 });
 
 test('runtime creation isolates mutable play state from authored content', () => {
@@ -36,7 +42,40 @@ test('runtime creation isolates mutable play state from authored content', () =>
 test('system selection falls back to the authored campaign entry', () => {
   assert.equal(DefaultAuthoredSystemIdentifier, 'first-light');
   assert.equal(getAuthoredSystemDefinition('first-light'), FirstLightSystemDefinition);
+  assert.equal(getAuthoredSystemDefinition('broken-belt'), BrokenBeltSystemDefinition);
   assert.equal(getAuthoredSystemDefinition('missing-system'), FirstLightSystemDefinition);
+});
+
+test('Broken Belt landing order exposes distinct authored continuations', () => {
+  const Runtime = createAuthoredSystemRuntime(BrokenBeltSystemDefinition);
+  const CampaignNodes = [
+    ...Runtime.worlds,
+    ...Runtime.tacticalBodies.filter((BodyDefinition) => BodyDefinition.kind !== 'hazard'),
+  ];
+
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'relay', 2, Runtime.routeSuggestions.relay)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['loom', 'kiln'],
+  );
+  Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'loom').restored = true;
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'loom', 2, Runtime.routeSuggestions.loom)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['shard', 'vault'],
+  );
+
+  const KilnFirstRuntime = createAuthoredSystemRuntime(BrokenBeltSystemDefinition);
+  const KilnFirstNodes = [
+    ...KilnFirstRuntime.worlds,
+    ...KilnFirstRuntime.tacticalBodies.filter((BodyDefinition) => BodyDefinition.kind !== 'hazard'),
+  ];
+  KilnFirstRuntime.worlds.find((WorldDefinition) => WorldDefinition.id === 'kiln').restored = true;
+  assert.deepEqual(
+    getRouteChoices(KilnFirstNodes, 'kiln', 2, KilnFirstRuntime.routeSuggestions.kiln)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['drift', 'vault'],
+  );
 });
 
 test('authored route suggestions preserve First Light choices and spatial fallback', () => {

@@ -137,6 +137,7 @@ async function verifyLocalRelease() {
 
   const ContentJavaScript = TextByPath.get('src/content.js');
   requireText(ContentJavaScript, 'AuthoredSystemDefinitions', 'authored-system registry');
+  requireText(ContentJavaScript, "id: 'broken-belt'", 'Broken Belt authored content');
   requireText(ContentJavaScript, 'completion:', 'authored completion presentation');
   requireText(ContentJavaScript, 'constellation:', 'authored constellation presentation');
 
@@ -186,11 +187,9 @@ async function verifyOnlineRelease() {
   const ContentUrl = new URL(`./src/content.js?v=${ContentMatch[1]}`, PublicGameUrl);
   const ContentResponse = await fetch(ContentUrl, { cache: 'no-store' });
   assert.ok(ContentResponse.ok, `Public authored content returned HTTP ${ContentResponse.status}`);
-  requireText(
-    await ContentResponse.text(),
-    "id: 'first-light'",
-    'public authored content',
-  );
+  const PublicContentJavaScript = await ContentResponse.text();
+  requireText(PublicContentJavaScript, "id: 'first-light'", 'public authored content');
+  requireText(PublicContentJavaScript, "id: 'broken-belt'", 'public Broken Belt content');
 
   const RuntimeMatch = PublicHtml.match(/"three"\s*:\s*"([^"]+)"/);
   assert.ok(RuntimeMatch, 'Public index must reference the vendored Three.js runtime');

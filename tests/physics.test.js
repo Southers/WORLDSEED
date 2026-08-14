@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getTrajectoryPickupIdentifiers } from '../src/campaign.js';
+import {
+  BrokenBeltSystemDefinition,
+  createAuthoredSystemRuntime,
+} from '../src/content.js';
 
 import {
   calculateBodyPositionAtTime,
@@ -620,5 +624,122 @@ test('the alternate Meadow shot predicts and reaches Grove on the same fixed ste
 
   assert.equal(Prediction.collisionWorldIdentifier, 'grove');
   assert.equal(LiveCollision?.id, 'grove');
+  assert.equal(LiveCollisionStep, Prediction.points.length - 1);
+});
+
+test('Broken Belt opens with deterministic direct and high-route landings', () => {
+  const Runtime = createAuthoredSystemRuntime(BrokenBeltSystemDefinition, { createVector });
+  const RelayDefinition = Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'relay');
+  const KilnDefinition = Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'kiln');
+  const RelayToKiln = createVector(
+    KilnDefinition.position.x - RelayDefinition.position.x,
+    KilnDefinition.position.y - RelayDefinition.position.y,
+    0,
+  );
+  const RelayToKilnLength = Math.hypot(RelayToKiln.x, RelayToKiln.y);
+  const StartingPosition = createVector(
+    RelayDefinition.position.x
+      + ((RelayToKiln.x / RelayToKilnLength) * (RelayDefinition.radius + 0.49)),
+    RelayDefinition.position.y
+      + ((RelayToKiln.y / RelayToKilnLength) * (RelayDefinition.radius + 0.49)),
+    0,
+  );
+  const createPrediction = (Velocity) => predictTrajectory(
+    StartingPosition,
+    Velocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: 1 / 120,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'relay',
+    },
+  );
+  const DirectPrediction = createPrediction(createVector(
+    (RelayToKiln.x / RelayToKilnLength) * 8.85,
+    (RelayToKiln.y / RelayToKilnLength) * 8.85,
+    0,
+  ));
+  const HighRouteAngleRadians = 106 * (Math.PI / 180);
+  const HighRoutePrediction = createPrediction(createVector(
+    Math.cos(HighRouteAngleRadians) * 8,
+    Math.sin(HighRouteAngleRadians) * 8,
+    0,
+  ));
+  const MasteryPrediction = predictTrajectory(
+    StartingPosition,
+    createVector(
+      Math.cos(HighRouteAngleRadians) * 8,
+      Math.sin(HighRouteAngleRadians) * 8,
+      0,
+    ),
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: 1 / 120,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'relay',
+      collisionBodyDefinitions: Runtime.tacticalBodies.filter(
+        (BodyDefinition) => BodyDefinition.kind !== 'worldheart',
+      ),
+      startTimeSeconds: 0,
+    },
+  );
+
+  assert.equal(DirectPrediction.collisionWorldIdentifier, 'kiln');
+  assert.equal(HighRoutePrediction.collisionWorldIdentifier, 'loom');
+  assert.equal(MasteryPrediction.collisionWorldIdentifier, 'loom');
+  assert.deepEqual(
+    getTrajectoryPickupIdentifiers(MasteryPrediction.points, Runtime.stardust, 0.68).sort(),
+    Runtime.stardust.map((StardustDefinition) => StardustDefinition.id).sort(),
+  );
+});
+
+test('Broken Belt Shard exit reaches the Belt Heart with matching live physics', () => {
+  const Runtime = createAuthoredSystemRuntime(BrokenBeltSystemDefinition, { createVector });
+  const CollisionBodyDefinitions = Runtime.tacticalBodies.filter(
+    (BodyDefinition) => BodyDefinition.kind !== 'seedstone',
+  );
+  const StartingPosition = createVector(1.971, 4.165, 0);
+  const LaunchAngleRadians = 138 * (Math.PI / 180);
+  const LaunchVelocity = createVector(
+    Math.cos(LaunchAngleRadians) * 5.45,
+    Math.sin(LaunchAngleRadians) * 5.45,
+    0,
+  );
+  const Prediction = predictTrajectory(
+    StartingPosition,
+    LaunchVelocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: 1 / 120,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'shard',
+      collisionBodyDefinitions: CollisionBodyDefinitions,
+      startTimeSeconds: 0,
+    },
+  );
+
+  let LiveState = { position: StartingPosition, velocity: LaunchVelocity };
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 520; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, Runtime.worlds, 1 / 120);
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      0.46,
+      CollisionBodyDefinitions,
+      StepIndex / 120,
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(Prediction.collisionKind, 'worldheart');
+  assert.equal(Prediction.collisionBodyIdentifier, 'belt-heart');
+  assert.equal(LiveCollision?.definition.id, 'belt-heart');
   assert.equal(LiveCollisionStep, Prediction.points.length - 1);
 });
