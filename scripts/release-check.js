@@ -19,6 +19,7 @@ const RequiredTextFiles = [
   'index.html',
   'src/audio.js',
   'src/campaign.js',
+  'src/content.js',
   'src/main.js',
   'src/physics.js',
   'src/restoration.js',
@@ -127,6 +128,7 @@ async function verifyLocalRelease() {
   const MainJavaScript = TextByPath.get('src/main.js');
   requirePattern(MainJavaScript, /\.\/audio\.js\?v=[^"']+/, 'main audio import');
   requirePattern(MainJavaScript, /\.\/campaign\.js\?v=[^"']+/, 'main campaign import');
+  requirePattern(MainJavaScript, /\.\/content\.js\?v=[^"']+/, 'main content import');
   requirePattern(MainJavaScript, /\.\/physics\.js\?v=[^"']+/, 'main physics import');
   requirePattern(MainJavaScript, /\.\/restoration\.js\?v=[^"']+/, 'main restoration import');
   requireText(MainJavaScript, "dataset.build = '", 'main build marker');
@@ -172,6 +174,17 @@ async function verifyOnlineRelease() {
   const PublicMainJavaScript = await ModuleResponse.text();
   requireText(PublicMainJavaScript, "dataset.build = '", 'public main module');
 
+  const ContentMatch = PublicMainJavaScript.match(/from '\.\/content\.js\?v=([^']+)'/);
+  assert.ok(ContentMatch, 'Public main module must reference versioned authored content');
+  const ContentUrl = new URL(`./src/content.js?v=${ContentMatch[1]}`, PublicGameUrl);
+  const ContentResponse = await fetch(ContentUrl, { cache: 'no-store' });
+  assert.ok(ContentResponse.ok, `Public authored content returned HTTP ${ContentResponse.status}`);
+  requireText(
+    await ContentResponse.text(),
+    "id: 'first-light'",
+    'public authored content',
+  );
+
   const RuntimeMatch = PublicHtml.match(/"three"\s*:\s*"([^"]+)"/);
   assert.ok(RuntimeMatch, 'Public index must reference the vendored Three.js runtime');
   const RuntimeUrl = new URL(RuntimeMatch[1], PublicGameUrl);
@@ -216,6 +229,7 @@ async function verifyOnlineRelease() {
 
   return {
     buildMarker: PublicMainJavaScript.match(/dataset\.build = '([^']+)'/)?.[1] ?? 'unknown',
+    contentStatus: ContentResponse.status,
     coreStatus: CoreResponse.status,
     pageStatus: PageResponse.status,
     runtimeStatus: RuntimeResponse.status,
@@ -236,6 +250,6 @@ console.log(
 );
 if (OnlineEvidence) {
   console.log(
-    `Public build: HTTP ${OnlineEvidence.pageStatus}, runtime/core HTTP ${OnlineEvidence.runtimeStatus}/${OnlineEvidence.coreStatus}, thumbnail HTTP ${OnlineEvidence.thumbnailStatus} ${OnlineEvidence.thumbnailContentType}, showcase HTTP ${OnlineEvidence.showcaseStatus} ${OnlineEvidence.showcaseContentType}, marker ${OnlineEvidence.buildMarker}.`,
+    `Public build: HTTP ${OnlineEvidence.pageStatus}, content/runtime/core HTTP ${OnlineEvidence.contentStatus}/${OnlineEvidence.runtimeStatus}/${OnlineEvidence.coreStatus}, thumbnail HTTP ${OnlineEvidence.thumbnailStatus} ${OnlineEvidence.thumbnailContentType}, showcase HTTP ${OnlineEvidence.showcaseStatus} ${OnlineEvidence.showcaseContentType}, marker ${OnlineEvidence.buildMarker}.`,
   );
 }

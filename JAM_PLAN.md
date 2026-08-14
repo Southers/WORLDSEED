@@ -68,6 +68,8 @@ Checkpoint: complete in First Light. The opening names the last living seed and 
 
 Exit: one complete branching system feels like a real game chapter rather than an expanded demo.
 
+Pipeline checkpoint: First Light now runs from a validated pure-data authored-system definition covering world physics, visual keys, restoration identity, story, tactical bodies, deterministic orbits, route emphasis, objective threshold and stardust. Runtime state is cloned from that definition, authored suggestions remain non-restrictive, and the release audit requires the content module. Twenty-seven deterministic tests plus desktop branch-order checks and a full 390×844 Worldheart run prove behavioural compatibility at 179 / 180 peak draw calls. The Broken Belt content itself remains the next checkpoint.
+
 ## Milestone 6 — Authored campaign
 
 - Build the Wandering Garden and Long Night systems using the proven content pipeline.
