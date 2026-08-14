@@ -84,6 +84,8 @@ python -m http.server 8080
 
 Then open `http://localhost:8080`.
 
+Registered authored systems can be selected during development with `?system=<id>`. Unknown identifiers safely fall back to the First Light campaign entry, and the canvas exposes the resolved system identifier for smoke-test automation.
+
 ## Validate physics
 
 ```bash
