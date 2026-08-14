@@ -95,6 +95,11 @@ async function verifyLocalRelease() {
   const IndexHtml = TextByPath.get('index.html');
   requireText(IndexHtml, '<title>WORLDSEED</title>', 'index.html');
   requireText(IndexHtml, 'submission/thumbnail.png', 'index.html');
+  requirePattern(
+    IndexHtml,
+    /submission\/thumbnail\.png\?v=[^"']+/,
+    'versioned social thumbnail',
+  );
   requireText(IndexHtml, 'twitter:card', 'index.html');
   requirePattern(IndexHtml, /src\/style\.css\?v=[^"']+/, 'index.html stylesheet');
   requirePattern(IndexHtml, /src\/main\.js\?v=[^"']+/, 'index.html module');
@@ -162,10 +167,21 @@ async function verifyLocalRelease() {
   requireText(SubmissionMarkdown, 'https://github.com/Southers/WORLDSEED', 'SUBMISSION.md');
   requireText(SubmissionMarkdown, 'Theme: Tiny Worlds', 'SUBMISSION.md');
   requireText(SubmissionMarkdown, 'submission/worldseed-showcase.mp4', 'SUBMISSION.md');
+  requireText(
+    SubmissionMarkdown,
+    'https://x.com/dangreenheck/status/2087399084940239337',
+    'verified jam entry destination',
+  );
+  requireText(
+    SubmissionMarkdown,
+    'Wednesday, 19 August 2026 at 00:00 UTC',
+    'verified jam deadline',
+  );
+  requireText(SubmissionMarkdown, 'Prepared reply', 'prepared jam reply');
   requireText(SubmissionMarkdown, 'FINAL APPROVAL REQUIRED:', 'SUBMISSION.md');
   requireText(
     SubmissionMarkdown,
-    "Obtain the user's explicit confirmation at the final Submit or Publish step.",
+    "Obtain the user's explicit confirmation at the final Reply or Post step.",
     'SUBMISSION.md',
   );
   requireText(SubmissionMarkdown, 'Published submission URL: _pending_', 'SUBMISSION.md');
@@ -228,7 +244,9 @@ async function verifyOnlineRelease() {
     'Public Three.js core must match pinned 0.179.1',
   );
 
-  const ThumbnailUrl = new URL('submission/thumbnail.png', PublicGameUrl);
+  const ThumbnailMatch = PublicHtml.match(/property="og:image" content="([^"]+)"/);
+  assert.ok(ThumbnailMatch, 'Public index must expose an Open Graph thumbnail');
+  const ThumbnailUrl = new URL(ThumbnailMatch[1], PublicGameUrl);
   ThumbnailUrl.searchParams.set('release-check', String(Date.now()));
   const ThumbnailResponse = await fetch(ThumbnailUrl, { cache: 'no-store' });
   assert.ok(ThumbnailResponse.ok, `Public thumbnail returned HTTP ${ThumbnailResponse.status}`);

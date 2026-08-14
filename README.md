@@ -130,6 +130,8 @@ npm run check
 
 The local audit verifies required release files, versioned internal URLs, credits, copy, all three 1200×600 showcase images and the H.264 review clip. The online audit additionally checks the deployed development page, runtime modules, public thumbnail and public clip MIME types.
 
+The current media set comes from a completed build `20260814-7s` Worldheart playthrough. It shows the branching finale opening, a late awakening, the physical route unlock, the system-scale pulse and the final constellation rather than the superseded three-world prototype. The silent review clip is 10.5 seconds at 1200×600, H.264 High, 30 fps and standard `yuv420p` colour range.
+
 ```bash
 npm run release:check
 npm run release:online
@@ -145,6 +147,8 @@ npm run release:online
 ## Submission approval boundary
 
 Submission preparation is part of the roadmap: keep the public build, credits, entry copy and showcase media current. The final external Submit or Publish action must never be triggered without the user's explicit confirmation at that moment.
+
+For this jam, the verified final action is replying to the [organizer's announcement](https://x.com/dangreenheck/status/2087399084940239337) by 19 August 2026 at 00:00 UTC with the playable link and Tiny Worlds explanation prepared in `SUBMISSION.md`. That reply remains strictly user-controlled.
 
 ## Project guide
 
