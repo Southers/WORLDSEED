@@ -178,6 +178,12 @@ async function verifyLocalRelease() {
     'verified jam deadline',
   );
   requireText(SubmissionMarkdown, 'Prepared reply', 'prepared jam reply');
+  requireText(SubmissionMarkdown, 'Final release evidence', 'final release evidence');
+  requireText(
+    SubmissionMarkdown,
+    'Manual check still required at handoff:',
+    'honest backgrounding handoff',
+  );
   requireText(SubmissionMarkdown, 'FINAL APPROVAL REQUIRED:', 'SUBMISSION.md');
   requireText(
     SubmissionMarkdown,

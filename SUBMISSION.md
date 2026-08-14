@@ -86,12 +86,21 @@ Checked against the organizer's live announcement on 14 August 2026:
 
 The irreversible external action is posting that reply on X. Open the post and prepare the reply if useful, but do not press **Reply**, **Post** or an equivalent publishing control without the user's explicit confirmation at that moment.
 
+## Final release evidence
+
+- Public build: `20260814-7s` at https://southers.github.io/WORLDSEED/
+- Pages deployment: https://github.com/Southers/WORLDSEED/actions/runs/31792011265 (passed)
+- Automated gates: 52 deterministic tests, syntax checks, local release audit and online release audit passed.
+- Browser coverage: all five chapters at 1280×720 and 390×844; rotation at 844×390; real portrait miss recovery, landing and Reset; public desktop/mobile smoke; clean consoles.
+- Media: public opening, thumbnail, victory image and showcase clip match their reviewed local files byte-for-byte.
+- Manual check still required at handoff: background the game during an unfinished drag, return, and confirm the shot is cancelled with no physics time jump. The automation browser does not expose a true `document.hidden` transition.
+
 ## Preparation checklist
 
 - [x] Confirm the current submission fields, rules, deadline and media requirements.
 - [x] Refresh the title, descriptions and Tiny Worlds explanation against the completed campaign.
 - [x] Verify the public URL from a clean desktop and mobile browser.
-- [ ] Run `npm test`, `npm run check` and `npm run release:online`.
+- [x] Run `npm test`, `npm run check` and `npm run release:online`.
 - [x] Confirm the source repository is public and `CREDITS.md` is current.
 - [x] Refresh the thumbnail, screenshots and showcase clip from the final build.
 - [x] Prepare every required entry field and present the final reply to the user for review.
