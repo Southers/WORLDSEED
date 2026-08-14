@@ -6,6 +6,7 @@ import {
   DefaultAuthoredSystemIdentifier,
   BrokenBeltSystemDefinition,
   FirstLightSystemDefinition,
+  LongNightSystemDefinition,
   WanderingGardenSystemDefinition,
   AuthoredCampaignSystemIdentifiers,
   createAuthoredSystemRuntime,
@@ -31,6 +32,15 @@ test('Wandering Garden satisfies the moving-system content contract', () => {
   );
   assert.ok(PollenMoonDefinition.orbit);
   assert.ok(PollenMoonDefinition.orbit.angularSpeedRadiansPerSecond > 0);
+});
+
+test('Long Night satisfies the authored campaign and environment contract', () => {
+  assert.deepEqual(validateAuthoredSystemDefinition(LongNightSystemDefinition), []);
+  assert.equal(LongNightSystemDefinition.worlds.length, 6);
+  assert.equal(LongNightSystemDefinition.worldheartUnlockThreshold, 4);
+  const Runtime = createAuthoredSystemRuntime(LongNightSystemDefinition);
+  assert.equal(Runtime.environment.backgroundColor, 0x02030b);
+  assert.equal(Runtime.environment.toneMappingExposure, 1.08);
 });
 
 test('runtime creation isolates mutable play state from authored content', () => {
@@ -91,6 +101,18 @@ test('content validation rejects malformed moving launch-node orbits', () => {
   ));
 });
 
+test('content validation rejects malformed authored environment palettes', () => {
+  const InvalidSystemDefinition = structuredClone(LongNightSystemDefinition);
+  InvalidSystemDefinition.environment.rimLightColor = -1;
+  InvalidSystemDefinition.environment.fogDensity = 0.2;
+
+  const Errors = validateAuthoredSystemDefinition(InvalidSystemDefinition);
+  assert.ok(Errors.includes(
+    'Authored system environment.rimLightColor requires a colour integer.',
+  ));
+  assert.ok(Errors.includes('Authored system environment has invalid fog or exposure ranges.'));
+});
+
 test('system selection falls back to the authored campaign entry', () => {
   assert.equal(DefaultAuthoredSystemIdentifier, 'first-light');
   assert.equal(getAuthoredSystemDefinition('first-light'), FirstLightSystemDefinition);
@@ -99,18 +121,40 @@ test('system selection falls back to the authored campaign entry', () => {
     getAuthoredSystemDefinition('wandering-garden'),
     WanderingGardenSystemDefinition,
   );
+  assert.equal(getAuthoredSystemDefinition('long-night'), LongNightSystemDefinition);
   assert.equal(getAuthoredSystemDefinition('missing-system'), FirstLightSystemDefinition);
 });
 
-test('campaign order advances through the Garden and leaves the frontier replayable', () => {
+test('campaign order advances through Long Night and leaves the frontier replayable', () => {
   assert.deepEqual(
     AuthoredCampaignSystemIdentifiers,
-    ['first-light', 'broken-belt', 'wandering-garden'],
+    ['first-light', 'broken-belt', 'wandering-garden', 'long-night'],
   );
   assert.equal(getNextAuthoredSystemIdentifier('first-light'), 'broken-belt');
   assert.equal(getNextAuthoredSystemIdentifier('broken-belt'), 'wandering-garden');
-  assert.equal(getNextAuthoredSystemIdentifier('wandering-garden'), null);
+  assert.equal(getNextAuthoredSystemIdentifier('wandering-garden'), 'long-night');
+  assert.equal(getNextAuthoredSystemIdentifier('long-night'), null);
   assert.equal(getNextAuthoredSystemIdentifier('missing-system'), null);
+});
+
+test('Long Night route order preserves a safe line and a higher-gravity commitment', () => {
+  const Runtime = createAuthoredSystemRuntime(LongNightSystemDefinition);
+  const CampaignNodes = [
+    ...Runtime.worlds,
+    ...Runtime.tacticalBodies.filter((BodyDefinition) => BodyDefinition.kind !== 'hazard'),
+  ];
+
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'vigil', 2, Runtime.routeSuggestions.vigil)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['hollow', 'pyre'],
+  );
+  Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'hollow').restored = true;
+  assert.deepEqual(
+    getRouteChoices(CampaignNodes, 'hollow', 2, Runtime.routeSuggestions.hollow)
+      .map((WorldDefinition) => WorldDefinition.id),
+    ['beacon', 'lumen'],
+  );
 });
 
 test('Wandering Garden makes its moving moon a genuine authored route choice', () => {

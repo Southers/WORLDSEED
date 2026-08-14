@@ -41,7 +41,7 @@ The campaign is a sequence of authored planetary systems rather than one unbound
 - **Prologue — First Light:** authored Meadow → Ember → Frost establishes the full-diorama visual bar while Grove's joined roots, Tide's encircling wave crests, a one-use Seedstone, the orbiting Wayfarer and a three-mote Arc prove branching routes, persistent launch nodes, environmental story, deterministic timing windows and optional mastery.
 - **System I — The Broken Belt:** six fractured relay worlds turn the opening into a safe Kiln route or a high Loom route that carries the full Arc. A central Vault creates a third launch geometry, while the predictable Sentinel orbit guards the Shard/Drift side of the system.
 - **System II — The Wandering Garden:** six living worlds surround an orbiting one-use Pollen Moon. Waiting changes whether that moon intersects a shot and where its carried seed can launch next, while Thornwing turns the upper garden into a readable moving-risk route.
-- **System III — The Long Night:** combines longer gravity assists, tighter safe routes and stronger narrative stakes.
+- **System III — The Long Night:** makes flight time and commitment the challenge. Pyre is a readable safe opening, Hollow demands a four-second high route, and the full Vigil-to-Beacon Arc begins inside Eclipse's collision window until the player waits for a clearing.
 - **Finale — Worldheart:** asks the player to use the full route vocabulary before delivering the largest restoration in the game.
 
 Names and world counts are provisional. Each system must earn its place through a distinct spatial problem and awakening identity.
@@ -58,6 +58,7 @@ Worldheart completion is the campaign handoff. When another authored chapter exi
 - authored route suggestions that prioritise useful choices without restricting valid collisions;
 - optional stardust positions and other system mastery data;
 - completion copy and constellation presentation, so a new chapter does not inherit First Light labels or summary geometry.
+- an optional environment palette for authored background, fog, exposure and scene lighting without forking the renderer.
 
 The validator rejects duplicate or missing identifiers, broken route references, incomplete restoration fields, invalid physics values and impossible objective thresholds before WebGL starts. Runtime creation then clones that validated definition into isolated mutable state, injecting the vector and colour types required by Three.js. Reset restores authored initial state rather than reconstructing content through hard-coded world names.
 
@@ -66,6 +67,8 @@ The current tactical renderer deliberately validates exactly one Seedstone or mo
 Broken Belt uses merged surface landmarks for final low-cost worlds: Relay's signal rings, Kiln's vent crown, Loom's linked arches, Shard's crystal crown, Drift's wave crests and Vault's protective ribs all share their planet surface draw call and grow through the same restoration wave. This is an authored visual tier, not greybox content; First Light's three multi-mesh dioramas remain the premium close-up benchmark.
 
 Wandering Garden uses the same one-call restoration tier without reusing the Belt's silhouettes: Bower's sheltering arches, Lantern's flower lamps, Canopy's clustered treetops, Crown's oversized petals, Dew's droplets and Nest's woven ribs establish a softer living system. The Pollen Moon adds a cyan orbit guide and moves its attached seed in fixed simulation time, making the chapter's spatial problem visible before the player commits.
+
+Long Night darkens the authored environment while preserving landing readability. Vigil's watchfires, Pyre's swept flames, Hollow's empty bells, Beacon's star rays, Umbra's crescents and Lumen's prism all grow through the same restoration surface. Its wider placement and heavier Beacon well create long arcs without changing controls or simulation rules.
 
 A new system should therefore require one data definition plus deliberately registered visual factories. It must not require a second physics implementation, per-system branches throughout the game loop or duplicated prediction logic. First Light is the behavioural compatibility fixture for this contract.
 
@@ -109,6 +112,7 @@ Asteroids should create readable choices rather than random punishment.
 - Contribute to system mastery rather than an economy.
 - Glow gold when the current shared-physics prediction will collect them, and state the promised pickup count before release.
 - Remain collected through the current run, while Reset restores the complete challenge.
+- Are provisional during flight and become permanent only after a valid landing; hazard and void recovery restore motes touched during the failed shot.
 
 ## Objectives and mastery
 
@@ -154,6 +158,8 @@ Example awakening lines:
 Broken Belt's fragments reveal a system that continued trying to communicate after it broke: its relay kept calling, its bridges remembered their neighbours, the furnaces guarded one coal and the Shard preserved a map in every face. Reconnecting the Belt Heart turns those separate memories into the first signal pointing beyond First Light.
 
 Wandering Garden answers that signal with movement rather than machinery. Its shelter saved one leaf, its lamp-flower opens to the void, its branches remember rain and its smallest Nest keeps a place for travellers. Reconnecting the Garden Heart sends the first living pulse toward the Long Night.
+
+Long Night raises the stakes without a cutscene: its watchfire refused to die, its bells waited for an unseen dawn, its shadow protected light and its buried star opens one patient eye. Reconnecting the Night Heart aligns every restored system toward the Worldheart beyond it.
 
 The campaign premise is simple:
 

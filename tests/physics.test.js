@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { getTrajectoryPickupIdentifiers } from '../src/campaign.js';
 import {
   BrokenBeltSystemDefinition,
+  LongNightSystemDefinition,
   WanderingGardenSystemDefinition,
   createAuthoredSystemRuntime,
 } from '../src/content.js';
@@ -905,4 +906,186 @@ test('Wandering Garden opens safely and its moving moon matches live collision t
   assert.equal(MoonPrediction.collisionBodyIdentifier, 'pollen-moon');
   assert.equal(LiveCollision?.definition.id, 'pollen-moon');
   assert.equal(LiveCollisionStep, MoonPrediction.points.length - 1);
+});
+
+test('Long Night opens with a safe line and a long high-route landing', () => {
+  const Runtime = createAuthoredSystemRuntime(LongNightSystemDefinition, { createVector });
+  const VigilDefinition = Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'vigil');
+  const PyreDefinition = Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'pyre');
+  const VigilToPyre = createVector(
+    PyreDefinition.position.x - VigilDefinition.position.x,
+    PyreDefinition.position.y - VigilDefinition.position.y,
+    0,
+  );
+  const VigilToPyreLength = Math.hypot(VigilToPyre.x, VigilToPyre.y);
+  const StartingPosition = createVector(
+    VigilDefinition.position.x
+      + ((VigilToPyre.x / VigilToPyreLength) * (VigilDefinition.radius + 0.49)),
+    VigilDefinition.position.y
+      + ((VigilToPyre.y / VigilToPyreLength) * (VigilDefinition.radius + 0.49)),
+    0,
+  );
+  const ActiveBodyDefinitions = Runtime.tacticalBodies.filter(
+    (BodyDefinition) => BodyDefinition.kind !== 'worldheart',
+  );
+  const createPrediction = (Velocity) => predictTrajectory(
+    StartingPosition,
+    Velocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: 1 / 120,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'vigil',
+      collisionBodyDefinitions: ActiveBodyDefinitions,
+      startTimeSeconds: 0,
+    },
+  );
+  const DirectPrediction = createPrediction(createVector(
+    (VigilToPyre.x / VigilToPyreLength) * 7.1,
+    (VigilToPyre.y / VigilToPyreLength) * 7.1,
+    0,
+  ));
+  const HighRouteAngleRadians = 160 * (Math.PI / 180);
+  const HighRoutePrediction = createPrediction(createVector(
+    Math.cos(HighRouteAngleRadians) * 3.4,
+    Math.sin(HighRouteAngleRadians) * 3.4,
+    0,
+  ));
+
+  assert.equal(DirectPrediction.collisionWorldIdentifier, 'pyre');
+  assert.equal(HighRoutePrediction.collisionWorldIdentifier, 'hollow');
+  assert.ok(HighRoutePrediction.points.length > DirectPrediction.points.length + 200);
+});
+
+test('Long Night Eclipse blocks the full Arc until a deterministic safe window', () => {
+  const FixedStepSeconds = 1 / 120;
+  const Runtime = createAuthoredSystemRuntime(LongNightSystemDefinition, { createVector });
+  const VigilDefinition = Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'vigil');
+  const PyreDefinition = Runtime.worlds.find((WorldDefinition) => WorldDefinition.id === 'pyre');
+  const VigilToPyre = createVector(
+    PyreDefinition.position.x - VigilDefinition.position.x,
+    PyreDefinition.position.y - VigilDefinition.position.y,
+    0,
+  );
+  const VigilToPyreLength = Math.hypot(VigilToPyre.x, VigilToPyre.y);
+  const StartingPosition = createVector(
+    VigilDefinition.position.x
+      + ((VigilToPyre.x / VigilToPyreLength) * (VigilDefinition.radius + 0.49)),
+    VigilDefinition.position.y
+      + ((VigilToPyre.y / VigilToPyreLength) * (VigilDefinition.radius + 0.49)),
+    0,
+  );
+  const ArcAngleRadians = 18 * (Math.PI / 180);
+  const ArcVelocity = createVector(
+    Math.cos(ArcAngleRadians) * 4.1,
+    Math.sin(ArcAngleRadians) * 4.1,
+    0,
+  );
+  const ActiveBodyDefinitions = Runtime.tacticalBodies.filter(
+    (BodyDefinition) => BodyDefinition.kind !== 'worldheart',
+  );
+  const createArcPrediction = (StartTimeSeconds) => predictTrajectory(
+    StartingPosition,
+    ArcVelocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: FixedStepSeconds,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'vigil',
+      collisionBodyDefinitions: ActiveBodyDefinitions,
+      startTimeSeconds: StartTimeSeconds,
+    },
+  );
+  const BlockedPrediction = createArcPrediction(0);
+  const ClearPrediction = createArcPrediction(2.5);
+
+  let LiveState = { position: StartingPosition, velocity: ArcVelocity };
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 520; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, Runtime.worlds, FixedStepSeconds);
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      0.46,
+      ActiveBodyDefinitions,
+      StepIndex * FixedStepSeconds,
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(BlockedPrediction.collisionKind, 'hazard');
+  assert.equal(BlockedPrediction.collisionBodyIdentifier, 'eclipse');
+  assert.equal(LiveCollision?.definition.id, 'eclipse');
+  assert.equal(LiveCollisionStep, BlockedPrediction.points.length - 1);
+  assert.equal(ClearPrediction.collisionWorldIdentifier, 'beacon');
+  assert.deepEqual(
+    getTrajectoryPickupIdentifiers(ClearPrediction.points, Runtime.stardust, 0.68).sort(),
+    Runtime.stardust.map((StardustDefinition) => StardustDefinition.id).sort(),
+  );
+});
+
+test('Long Night Beacon exit reaches the Night Heart with matching live physics', () => {
+  const FixedStepSeconds = 1 / 120;
+  const Runtime = createAuthoredSystemRuntime(LongNightSystemDefinition, { createVector });
+  const BeaconLaunchPosition = createVector(-3.761034475181679, 5.668893830250314, 0);
+  const LaunchAngleRadians = 43 * (Math.PI / 180);
+  const LaunchVelocity = createVector(
+    Math.cos(LaunchAngleRadians) * 2,
+    Math.sin(LaunchAngleRadians) * 2,
+    0,
+  );
+  const CollisionBodyDefinitions = Runtime.tacticalBodies.filter(
+    (BodyDefinition) => BodyDefinition.kind !== 'seedstone',
+  );
+  const StartTimeSeconds = 10;
+  const Prediction = predictTrajectory(
+    BeaconLaunchPosition,
+    LaunchVelocity,
+    Runtime.worlds,
+    {
+      seedRadius: 0.46,
+      fixedStepSeconds: FixedStepSeconds,
+      maximumSteps: 520,
+      ignoredWorldIdentifier: 'beacon',
+      collisionBodyDefinitions: CollisionBodyDefinitions,
+      startTimeSeconds: StartTimeSeconds,
+    },
+  );
+
+  let LiveState = { position: BeaconLaunchPosition, velocity: LaunchVelocity };
+  let IgnoredWorldIdentifier = 'beacon';
+  let LiveCollision = null;
+  let LiveCollisionStep = null;
+  for (let StepIndex = 1; StepIndex <= 520; StepIndex += 1) {
+    LiveState = simulatePhysicsStep(LiveState, Runtime.worlds, FixedStepSeconds);
+    if (IgnoredWorldIdentifier) {
+      const ClearDistance = 4.1 + 0.46 + 0.35;
+      if (
+        calculateDistanceSquared(LiveState.position, { x: 0, y: 8.3, z: 0 })
+        > (ClearDistance * ClearDistance)
+      ) {
+        IgnoredWorldIdentifier = null;
+      }
+    }
+    LiveCollision = findCollidingBody(
+      LiveState.position,
+      0.46,
+      CollisionBodyDefinitions,
+      StartTimeSeconds + (StepIndex * FixedStepSeconds),
+    );
+    if (LiveCollision) {
+      LiveCollisionStep = StepIndex;
+      break;
+    }
+  }
+
+  assert.equal(Prediction.collisionKind, 'worldheart');
+  assert.equal(Prediction.collisionBodyIdentifier, 'night-heart');
+  assert.equal(LiveCollision?.definition.id, 'night-heart');
+  assert.equal(LiveCollisionStep, Prediction.points.length - 1);
 });

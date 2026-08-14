@@ -18,22 +18,22 @@ Slingshot a living seed across connected tiny planets, use one-shot Seedstones, 
 
 ## Short description
 
-WORLDSEED is a one-input orbital slingshot game built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, choose between tiny worlds and tactical Seedstones, and time your route around deterministic asteroids on the journey to the Worldheart.
+WORLDSEED is a one-input orbital slingshot campaign built with Three.js. Drag the seed backwards, trust the gravity-curved trajectory, choose between tiny worlds and tactical launch bodies, and time your route around deterministic asteroids while reconnecting a path to the Worldheart.
 
 ## Long-form description
 
 ### Bring the little worlds back to life
 
-WORLDSEED is a focused Three.js orbital slingshot game about restoring a miniature planetary system.
+WORLDSEED is a focused Three.js orbital slingshot game about carrying life through a sequence of miniature planetary systems.
 
 Drag the glowing seed backwards and release it into the gravity wells of a connected miniature system. The trajectory preview uses the same deterministic fixed-step simulation as live flight—including the future position of moving hazards—so every curved shot is yours. Land successfully and a luminous restoration wave wraps around the planet from the exact impact point, growing its diorama, atmosphere, motion and music in sequence.
 
 - **One expressive input:** drag and release with mouse, pen or touch.
-- **A connected First Light system:** authored Meadow, volcanic Ember and crystalline Frost plus Grove's joined roots and Tide's encircling wave crests.
+- **A four-chapter journey:** First Light teaches the seed's purpose; Broken Belt introduces fractured route choices; Wandering Garden adds an orbiting Pollen Moon launch window; Long Night demands longer gravity commitments on the road to the Worldheart.
 - **A trustworthy gravity toy:** prediction and live flight share one deterministic simulation.
-- **Readable tactical routes:** one-use Seedstones create new launch geometry, while orbiting asteroids turn future collisions red before release.
-- **Optional mastery:** a three-mote Arc rewards an expressive Meadow-to-Frost curve, with predicted pickups highlighted before release and tracked for the run.
-- **A clear objective:** restore three worlds to expose a physical Worldheart exit, or keep routing to earn the optional Bloom and Arc emblems before leaving.
+- **Readable tactical routes:** one-use Seedstones and a moving moon create new launch geometry, while orbiting asteroids turn future collisions red before release.
+- **Optional mastery:** each system's three-mote Arc rewards an expressive route; predicted pickups glow before release and bank only after a successful landing.
+- **A clear objective:** awaken enough worlds to expose each physical Worldheart exit, or keep routing to earn the optional Bloom and Arc emblems before leaving.
 - **Story through play:** every awakening reveals one short memory, while close passes and gravity assists celebrate expressive routes without interrupting the next choice.
 - **Immediate recovery:** failed shots return the seed quickly, preserving experimentation.
 - **An authored transformation:** every landing awakens colour, landmarks, ambience and another layer of the procedural score.
@@ -49,7 +49,7 @@ No downloaded art or audio assets are used. The dioramas, particles, shaders, mu
 
 ### Theme: Tiny Worlds
 
-The tiny worlds are both the subject and the mechanic. Their curved surfaces create the gravity puzzle, their miniature landmarks make each landing readable, and awakening an entire planet turns a successful shot into a visible world-scale reward. The complete game is deliberately scoped to a polished authored journey across connected desk-toy dioramas.
+The tiny worlds are both the subject and the mechanic. Their curved surfaces create the gravity puzzle, their miniature landmarks make each landing readable, and awakening an entire planet turns a successful shot into a visible world-scale reward. The game is deliberately scoped to a polished authored journey across connected desk-toy systems rather than an infinite universe.
 
 ### Technology
 
