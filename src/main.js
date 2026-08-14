@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 
-import { WorldseedAudio } from './audio.js?v=20260814-7l';
+import { WorldseedAudio } from './audio.js?v=20260814-7m';
 
 import {
   DefaultAuthoredSystemIdentifier,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
-} from './content.js?v=20260814-7l';
+  getNextAuthoredSystemIdentifier,
+} from './content.js?v=20260814-7m';
 
 import {
   countRestoredWorlds,
@@ -17,7 +18,7 @@ import {
   getTrajectoryPickupIdentifiers,
   isSystemRestored,
   isWorldheartUnlocked,
-} from './campaign.js?v=20260814-7l';
+} from './campaign.js?v=20260814-7m';
 
 import {
   calculateBodyPositionAtTime,
@@ -27,12 +28,12 @@ import {
   findCollidingWorld,
   predictTrajectory,
   simulatePhysicsStep,
-} from './physics.js?v=20260814-7l';
+} from './physics.js?v=20260814-7m';
 import {
   calculateNormalizedSphericalDistance,
   calculateRestorationWaveProgress,
   calculateStagedGrowthProgress,
-} from './restoration.js?v=20260814-7l';
+} from './restoration.js?v=20260814-7m';
 
 const RequestedSystemIdentifier = new URLSearchParams(window.location.search).get('system')
   ?? DefaultAuthoredSystemIdentifier;
@@ -43,6 +44,7 @@ const ActiveSystem = createAuthoredSystemRuntime(
     createColor: (ColorValue) => new THREE.Color(ColorValue),
   },
 );
+const NextSystemIdentifier = getNextAuthoredSystemIdentifier(ActiveSystem.id);
 const WorldDefinitions = ActiveSystem.worlds;
 const TacticalBodyDefinitions = ActiveSystem.tacticalBodies;
 const SeedstoneDefinition = TacticalBodyDefinitions.find(
@@ -99,7 +101,7 @@ const PlayAgainButtonElement = document.querySelector('#PlayAgainButton');
 const ResetButtonElement = document.querySelector('#ResetButton');
 const AudioButtonElement = document.querySelector('#AudioButton');
 configureSystemInterface();
-GameCanvas.dataset.build = '20260814-7l';
+GameCanvas.dataset.build = '20260814-7m';
 GameCanvas.dataset.system = ActiveSystem.id;
 
 /** Fixed-step physics makes live movement and trajectory prediction agree across frame rates. */
@@ -211,6 +213,9 @@ function configureSystemInterface() {
     `${ActiveSystem.label} constellation summary`,
   );
   EmblemRowElement.setAttribute('aria-label', `${ActiveSystem.label} emblems`);
+  PlayAgainButtonElement.textContent = NextSystemIdentifier
+    ? `Continue to ${getAuthoredSystemDefinition(NextSystemIdentifier).label}`
+    : `Replay ${ActiveSystem.label}`;
 
   ObjectivePipsElement.replaceChildren();
   for (let PipIndex = 0; PipIndex < ActiveSystem.worldheartUnlockThreshold; PipIndex += 1) {
@@ -3848,6 +3853,18 @@ function resetGame() {
   );
 }
 
+/** Advances at a completed Worldheart, while keeping the campaign frontier replayable. */
+function continueCampaignOrReplay() {
+  if (!NextSystemIdentifier) {
+    resetGame();
+    return;
+  }
+
+  const NextSystemUrl = new URL(window.location.href);
+  NextSystemUrl.searchParams.set('system', NextSystemIdentifier);
+  window.location.assign(NextSystemUrl);
+}
+
 /** Main frame loop. */
 function renderFrame() {
   window.requestAnimationFrame(renderFrame);
@@ -3926,7 +3943,7 @@ window.addEventListener('keydown', (KeyboardEventData) => {
   }
 });
 ResetButtonElement.addEventListener('click', resetGame);
-PlayAgainButtonElement.addEventListener('click', resetGame);
+PlayAgainButtonElement.addEventListener('click', continueCampaignOrReplay);
 AudioButtonElement.addEventListener('click', () => {
   const IsMuted = WorldseedSound.toggleMute();
   AudioButtonElement.textContent = IsMuted ? 'Audio off [M]' : 'Audio on [M]';

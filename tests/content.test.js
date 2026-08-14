@@ -6,8 +6,10 @@ import {
   DefaultAuthoredSystemIdentifier,
   BrokenBeltSystemDefinition,
   FirstLightSystemDefinition,
+  AuthoredCampaignSystemIdentifiers,
   createAuthoredSystemRuntime,
   getAuthoredSystemDefinition,
+  getNextAuthoredSystemIdentifier,
   validateAuthoredSystemDefinition,
 } from '../src/content.js';
 
@@ -44,6 +46,13 @@ test('system selection falls back to the authored campaign entry', () => {
   assert.equal(getAuthoredSystemDefinition('first-light'), FirstLightSystemDefinition);
   assert.equal(getAuthoredSystemDefinition('broken-belt'), BrokenBeltSystemDefinition);
   assert.equal(getAuthoredSystemDefinition('missing-system'), FirstLightSystemDefinition);
+});
+
+test('campaign order advances from First Light and leaves the frontier replayable', () => {
+  assert.deepEqual(AuthoredCampaignSystemIdentifiers, ['first-light', 'broken-belt']);
+  assert.equal(getNextAuthoredSystemIdentifier('first-light'), 'broken-belt');
+  assert.equal(getNextAuthoredSystemIdentifier('broken-belt'), null);
+  assert.equal(getNextAuthoredSystemIdentifier('missing-system'), null);
 });
 
 test('Broken Belt landing order exposes distinct authored continuations', () => {
